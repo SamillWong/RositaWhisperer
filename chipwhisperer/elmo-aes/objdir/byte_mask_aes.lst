@@ -1,0 +1,2262 @@
+   1              		.cpu cortex-m0
+   2              		.eabi_attribute 20, 1
+   3              		.eabi_attribute 21, 1
+   4              		.eabi_attribute 23, 3
+   5              		.eabi_attribute 24, 1
+   6              		.eabi_attribute 25, 1
+   7              		.eabi_attribute 26, 1
+   8              		.eabi_attribute 30, 4
+   9              		.eabi_attribute 34, 0
+  10              		.eabi_attribute 18, 4
+  11              		.file	"byte_mask_aes.c"
+  12              		.text
+  13              	.Ltext0:
+  14              		.cfi_sections	.debug_frame
+  15              		.section	.text.KeyExpansion,"ax",%progbits
+  16              		.align	1
+  17              		.global	KeyExpansion
+  18              		.arch armv6s-m
+  19              		.syntax unified
+  20              		.code	16
+  21              		.thumb_func
+  22              		.fpu softvfp
+  24              	KeyExpansion:
+  25              	.LVL0:
+  26              	.LFB4:
+  27              		.file 1 "byte_mask_aes.c"
+   1:byte_mask_aes.c **** 
+   2:byte_mask_aes.c **** /*
+   3:byte_mask_aes.c ****  *
+   4:byte_mask_aes.c ****  * Virginia Tech
+   5:byte_mask_aes.c ****  * Secure Embedded Systems Lab
+   6:byte_mask_aes.c ****  *
+   7:byte_mask_aes.c ****  * Copyright (C) 2017 Virginia Tech
+   8:byte_mask_aes.c ****  *
+   9:byte_mask_aes.c ****  * Written in 2017 by Yuan Yao. This masked implementation refers to
+  10:byte_mask_aes.c ****  * https://github.com/ermin-sakic/smartcard-aes-fw.
+  11:byte_mask_aes.c ****  *
+  12:byte_mask_aes.c ****  * This is free software; you can redistribute it and/or modify
+  13:byte_mask_aes.c ****  * it under the terms of the GNU General Public License as published by
+  14:byte_mask_aes.c ****  * the Free Software Foundation; either version 3 of the License, or
+  15:byte_mask_aes.c ****  * (at your option) any later version.
+  16:byte_mask_aes.c ****  *
+  17:byte_mask_aes.c ****  * This software is distributed in the hope that it will be useful,
+  18:byte_mask_aes.c ****  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  19:byte_mask_aes.c ****  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  20:byte_mask_aes.c ****  * GNU General Public License for more details.
+  21:byte_mask_aes.c ****  *
+  22:byte_mask_aes.c ****  * You should have received a copy of the GNU General Public License
+  23:byte_mask_aes.c ****  * along with this program; if not, see <http://www.gnu.org/licenses/>.
+  24:byte_mask_aes.c ****  *
+  25:byte_mask_aes.c ****  */
+  26:byte_mask_aes.c **** 
+  27:byte_mask_aes.c **** #include "hal.h"
+  28:byte_mask_aes.c **** #include "byte_mask_aes.h"
+  29:byte_mask_aes.c **** #include "elmoasmfunctionsdef.h"
+  30:byte_mask_aes.c **** #include <stdlib.h>
+  31:byte_mask_aes.c **** #include <stdint.h>
+  32:byte_mask_aes.c **** #include <stdio.h>
+  33:byte_mask_aes.c **** #include <string.h>
+  34:byte_mask_aes.c **** 
+  35:byte_mask_aes.c **** #define Nb 4
+  36:byte_mask_aes.c **** // The number of 32 bit words in a key.
+  37:byte_mask_aes.c **** #define Nk 4
+  38:byte_mask_aes.c **** // Key length in bytes [128 bit]
+  39:byte_mask_aes.c **** #define KEYLEN 16
+  40:byte_mask_aes.c **** // The number of rounds in AES Cipher.
+  41:byte_mask_aes.c **** #define Nr 10
+  42:byte_mask_aes.c **** 
+  43:byte_mask_aes.c **** const uint8_t sbox[256] = {
+  44:byte_mask_aes.c ****     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5,
+  45:byte_mask_aes.c ****     0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
+  46:byte_mask_aes.c ****     0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0,
+  47:byte_mask_aes.c ****     0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
+  48:byte_mask_aes.c ****     0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc,
+  49:byte_mask_aes.c ****     0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
+  50:byte_mask_aes.c ****     0x04, 0xc7, 0x23, 0xc3, 0x18, 0x96, 0x05, 0x9a,
+  51:byte_mask_aes.c ****     0x07, 0x12, 0x80, 0xe2, 0xeb, 0x27, 0xb2, 0x75,
+  52:byte_mask_aes.c ****     0x09, 0x83, 0x2c, 0x1a, 0x1b, 0x6e, 0x5a, 0xa0,
+  53:byte_mask_aes.c ****     0x52, 0x3b, 0xd6, 0xb3, 0x29, 0xe3, 0x2f, 0x84,
+  54:byte_mask_aes.c ****     0x53, 0xd1, 0x00, 0xed, 0x20, 0xfc, 0xb1, 0x5b,
+  55:byte_mask_aes.c ****     0x6a, 0xcb, 0xbe, 0x39, 0x4a, 0x4c, 0x58, 0xcf,
+  56:byte_mask_aes.c ****     0xd0, 0xef, 0xaa, 0xfb, 0x43, 0x4d, 0x33, 0x85,
+  57:byte_mask_aes.c ****     0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c, 0x9f, 0xa8,
+  58:byte_mask_aes.c ****     0x51, 0xa3, 0x40, 0x8f, 0x92, 0x9d, 0x38, 0xf5,
+  59:byte_mask_aes.c ****     0xbc, 0xb6, 0xda, 0x21, 0x10, 0xff, 0xf3, 0xd2,
+  60:byte_mask_aes.c ****     0xcd, 0x0c, 0x13, 0xec, 0x5f, 0x97, 0x44, 0x17,
+  61:byte_mask_aes.c ****     0xc4, 0xa7, 0x7e, 0x3d, 0x64, 0x5d, 0x19, 0x73,
+  62:byte_mask_aes.c ****     0x60, 0x81, 0x4f, 0xdc, 0x22, 0x2a, 0x90, 0x88,
+  63:byte_mask_aes.c ****     0x46, 0xee, 0xb8, 0x14, 0xde, 0x5e, 0x0b, 0xdb,
+  64:byte_mask_aes.c ****     0xe0, 0x32, 0x3a, 0x0a, 0x49, 0x06, 0x24, 0x5c,
+  65:byte_mask_aes.c ****     0xc2, 0xd3, 0xac, 0x62, 0x91, 0x95, 0xe4, 0x79,
+  66:byte_mask_aes.c ****     0xe7, 0xc8, 0x37, 0x6d, 0x8d, 0xd5, 0x4e, 0xa9,
+  67:byte_mask_aes.c ****     0x6c, 0x56, 0xf4, 0xea, 0x65, 0x7a, 0xae, 0x08,
+  68:byte_mask_aes.c ****     0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6, 0xb4, 0xc6,
+  69:byte_mask_aes.c ****     0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a,
+  70:byte_mask_aes.c ****     0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e,
+  71:byte_mask_aes.c ****     0x61, 0x35, 0x57, 0xb9, 0x86, 0xc1, 0x1d, 0x9e,
+  72:byte_mask_aes.c ****     0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94,
+  73:byte_mask_aes.c ****     0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
+  74:byte_mask_aes.c ****     0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68,
+  75:byte_mask_aes.c ****     0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
+  76:byte_mask_aes.c **** };
+  77:byte_mask_aes.c **** 
+  78:byte_mask_aes.c **** static const uint8_t Rcon[255] = {
+  79:byte_mask_aes.c ****   0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a,
+  80:byte_mask_aes.c ****   0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91, 0x39,
+  81:byte_mask_aes.c ****   0x72, 0xe4, 0xd3, 0xbd, 0x61, 0xc2, 0x9f, 0x25, 0x4a, 0x94, 0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a,
+  82:byte_mask_aes.c ****   0x74, 0xe8, 0xcb, 0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8,
+  83:byte_mask_aes.c ****   0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef,
+  84:byte_mask_aes.c ****   0xc5, 0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd, 0x61, 0xc2, 0x9f, 0x25, 0x4a, 0x94, 0x33, 0x66, 0xcc,
+  85:byte_mask_aes.c ****   0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb, 0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b,
+  86:byte_mask_aes.c ****   0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3,
+  87:byte_mask_aes.c ****   0x7d, 0xfa, 0xef, 0xc5, 0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd, 0x61, 0xc2, 0x9f, 0x25, 0x4a, 0x94,
+  88:byte_mask_aes.c ****   0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb, 0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20,
+  89:byte_mask_aes.c ****   0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35,
+  90:byte_mask_aes.c ****   0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd, 0x61, 0xc2, 0x9f,
+  91:byte_mask_aes.c ****   0x25, 0x4a, 0x94, 0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb, 0x8d, 0x01, 0x02, 0x04,
+  92:byte_mask_aes.c ****   0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63,
+  93:byte_mask_aes.c ****   0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd,
+  94:byte_mask_aes.c ****   0x61, 0xc2, 0x9f, 0x25, 0x4a, 0x94, 0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb  };
+  95:byte_mask_aes.c **** 
+  96:byte_mask_aes.c **** 
+  97:byte_mask_aes.c **** const uint8_t mul_02[256]={
+  98:byte_mask_aes.c **** 0x00,0x02,0x04,0x06,0x08,0x0a,0x0c,0x0e,0x10,0x12,0x14,0x16,0x18,0x1a,0x1c,0x1e,
+  99:byte_mask_aes.c **** 0x20,0x22,0x24,0x26,0x28,0x2a,0x2c,0x2e,0x30,0x32,0x34,0x36,0x38,0x3a,0x3c,0x3e,
+ 100:byte_mask_aes.c **** 0x40,0x42,0x44,0x46,0x48,0x4a,0x4c,0x4e,0x50,0x52,0x54,0x56,0x58,0x5a,0x5c,0x5e,
+ 101:byte_mask_aes.c **** 0x60,0x62,0x64,0x66,0x68,0x6a,0x6c,0x6e,0x70,0x72,0x74,0x76,0x78,0x7a,0x7c,0x7e,
+ 102:byte_mask_aes.c **** 0x80,0x82,0x84,0x86,0x88,0x8a,0x8c,0x8e,0x90,0x92,0x94,0x96,0x98,0x9a,0x9c,0x9e,
+ 103:byte_mask_aes.c **** 0xa0,0xa2,0xa4,0xa6,0xa8,0xaa,0xac,0xae,0xb0,0xb2,0xb4,0xb6,0xb8,0xba,0xbc,0xbe,
+ 104:byte_mask_aes.c **** 0xc0,0xc2,0xc4,0xc6,0xc8,0xca,0xcc,0xce,0xd0,0xd2,0xd4,0xd6,0xd8,0xda,0xdc,0xde,
+ 105:byte_mask_aes.c **** 0xe0,0xe2,0xe4,0xe6,0xe8,0xea,0xec,0xee,0xf0,0xf2,0xf4,0xf6,0xf8,0xfa,0xfc,0xfe,
+ 106:byte_mask_aes.c **** 0x1b,0x19,0x1f,0x1d,0x13,0x11,0x17,0x15,0x0b,0x09,0x0f,0x0d,0x03,0x01,0x07,0x05,
+ 107:byte_mask_aes.c **** 0x3b,0x39,0x3f,0x3d,0x33,0x31,0x37,0x35,0x2b,0x29,0x2f,0x2d,0x23,0x21,0x27,0x25,
+ 108:byte_mask_aes.c **** 0x5b,0x59,0x5f,0x5d,0x53,0x51,0x57,0x55,0x4b,0x49,0x4f,0x4d,0x43,0x41,0x47,0x45,
+ 109:byte_mask_aes.c **** 0x7b,0x79,0x7f,0x7d,0x73,0x71,0x77,0x75,0x6b,0x69,0x6f,0x6d,0x63,0x61,0x67,0x65,
+ 110:byte_mask_aes.c **** 0x9b,0x99,0x9f,0x9d,0x93,0x91,0x97,0x95,0x8b,0x89,0x8f,0x8d,0x83,0x81,0x87,0x85,
+ 111:byte_mask_aes.c **** 0xbb,0xb9,0xbf,0xbd,0xb3,0xb1,0xb7,0xb5,0xab,0xa9,0xaf,0xad,0xa3,0xa1,0xa7,0xa5,
+ 112:byte_mask_aes.c **** 0xdb,0xd9,0xdf,0xdd,0xd3,0xd1,0xd7,0xd5,0xcb,0xc9,0xcf,0xcd,0xc3,0xc1,0xc7,0xc5,
+ 113:byte_mask_aes.c **** 0xfb,0xf9,0xff,0xfd,0xf3,0xf1,0xf7,0xf5,0xeb,0xe9,0xef,0xed,0xe3,0xe1,0xe7,0xe5
+ 114:byte_mask_aes.c **** };
+ 115:byte_mask_aes.c **** 
+ 116:byte_mask_aes.c **** 
+ 117:byte_mask_aes.c **** const uint8_t mul_03[256]={
+ 118:byte_mask_aes.c **** 0x00,0x03,0x06,0x05,0x0c,0x0f,0x0a,0x09,0x18,0x1b,0x1e,0x1d,0x14,0x17,0x12,0x11,
+ 119:byte_mask_aes.c **** 0x30,0x33,0x36,0x35,0x3c,0x3f,0x3a,0x39,0x28,0x2b,0x2e,0x2d,0x24,0x27,0x22,0x21,
+ 120:byte_mask_aes.c **** 0x60,0x63,0x66,0x65,0x6c,0x6f,0x6a,0x69,0x78,0x7b,0x7e,0x7d,0x74,0x77,0x72,0x71,
+ 121:byte_mask_aes.c **** 0x50,0x53,0x56,0x55,0x5c,0x5f,0x5a,0x59,0x48,0x4b,0x4e,0x4d,0x44,0x47,0x42,0x41,
+ 122:byte_mask_aes.c **** 0xc0,0xc3,0xc6,0xc5,0xcc,0xcf,0xca,0xc9,0xd8,0xdb,0xde,0xdd,0xd4,0xd7,0xd2,0xd1,
+ 123:byte_mask_aes.c **** 0xf0,0xf3,0xf6,0xf5,0xfc,0xff,0xfa,0xf9,0xe8,0xeb,0xee,0xed,0xe4,0xe7,0xe2,0xe1,
+ 124:byte_mask_aes.c **** 0xa0,0xa3,0xa6,0xa5,0xac,0xaf,0xaa,0xa9,0xb8,0xbb,0xbe,0xbd,0xb4,0xb7,0xb2,0xb1,
+ 125:byte_mask_aes.c **** 0x90,0x93,0x96,0x95,0x9c,0x9f,0x9a,0x99,0x88,0x8b,0x8e,0x8d,0x84,0x87,0x82,0x81,
+ 126:byte_mask_aes.c **** 0x9b,0x98,0x9d,0x9e,0x97,0x94,0x91,0x92,0x83,0x80,0x85,0x86,0x8f,0x8c,0x89,0x8a,
+ 127:byte_mask_aes.c **** 0xab,0xa8,0xad,0xae,0xa7,0xa4,0xa1,0xa2,0xb3,0xb0,0xb5,0xb6,0xbf,0xbc,0xb9,0xba,
+ 128:byte_mask_aes.c **** 0xfb,0xf8,0xfd,0xfe,0xf7,0xf4,0xf1,0xf2,0xe3,0xe0,0xe5,0xe6,0xef,0xec,0xe9,0xea,
+ 129:byte_mask_aes.c **** 0xcb,0xc8,0xcd,0xce,0xc7,0xc4,0xc1,0xc2,0xd3,0xd0,0xd5,0xd6,0xdf,0xdc,0xd9,0xda,
+ 130:byte_mask_aes.c **** 0x5b,0x58,0x5d,0x5e,0x57,0x54,0x51,0x52,0x43,0x40,0x45,0x46,0x4f,0x4c,0x49,0x4a,
+ 131:byte_mask_aes.c **** 0x6b,0x68,0x6d,0x6e,0x67,0x64,0x61,0x62,0x73,0x70,0x75,0x76,0x7f,0x7c,0x79,0x7a,
+ 132:byte_mask_aes.c **** 0x3b,0x38,0x3d,0x3e,0x37,0x34,0x31,0x32,0x23,0x20,0x25,0x26,0x2f,0x2c,0x29,0x2a,
+ 133:byte_mask_aes.c **** 0x0b,0x08,0x0d,0x0e,0x07,0x04,0x01,0x02,0x13,0x10,0x15,0x16,0x1f,0x1c,0x19,0x1a
+ 134:byte_mask_aes.c **** };
+ 135:byte_mask_aes.c **** 
+ 136:byte_mask_aes.c **** #define ALIGN __attribute__ ((aligned (4)))
+ 137:byte_mask_aes.c **** 
+ 138:byte_mask_aes.c **** uint8_t Sbox_masked[256] ALIGN;
+ 139:byte_mask_aes.c **** uint8_t Mask[10] ALIGN;
+ 140:byte_mask_aes.c **** uint8_t WordMask[4] ALIGN;
+ 141:byte_mask_aes.c **** uint8_t RoundKey_masked[11][16] ALIGN;
+ 142:byte_mask_aes.c **** uint8_t roundKey[176] ALIGN;
+ 143:byte_mask_aes.c **** 
+ 144:byte_mask_aes.c **** static uint8_t getSBoxValue(uint8_t num)
+ 145:byte_mask_aes.c **** {
+ 146:byte_mask_aes.c ****     return sbox[num];
+ 147:byte_mask_aes.c **** }
+ 148:byte_mask_aes.c **** 
+ 149:byte_mask_aes.c **** //key expansion
+ 150:byte_mask_aes.c **** void KeyExpansion(uint8_t* Key)
+ 151:byte_mask_aes.c **** {
+  28              		.loc 1 151 1 view -0
+  29              		.cfi_startproc
+  30              		@ args = 0, pretend = 0, frame = 8
+  31              		@ frame_needed = 0, uses_anonymous_args = 0
+ 152:byte_mask_aes.c ****   uint32_t i, j, k;
+  32              		.loc 1 152 3 view .LVU1
+ 153:byte_mask_aes.c ****   uint8_t tempa[4];
+  33              		.loc 1 153 3 view .LVU2
+ 154:byte_mask_aes.c **** 
+ 155:byte_mask_aes.c ****   // The first round key
+ 156:byte_mask_aes.c ****   for(i = 0; i < Nk; ++i)
+  34              		.loc 1 156 3 view .LVU3
+  35              		.loc 1 156 16 view .LVU4
+ 151:byte_mask_aes.c ****   uint32_t i, j, k;
+  36              		.loc 1 151 1 is_stmt 0 view .LVU5
+  37 0000 F7B5     		push	{r0, r1, r2, r4, r5, r6, r7, lr}
+  38              	.LCFI0:
+  39              		.cfi_def_cfa_offset 32
+  40              		.cfi_offset 0, -32
+  41              		.cfi_offset 1, -28
+  42              		.cfi_offset 2, -24
+  43              		.cfi_offset 4, -20
+  44              		.cfi_offset 5, -16
+  45              		.cfi_offset 6, -12
+  46              		.cfi_offset 7, -8
+  47              		.cfi_offset 14, -4
+  48 0002 204D     		ldr	r5, .L8
+  49 0004 0200     		movs	r2, r0
+ 151:byte_mask_aes.c ****   uint32_t i, j, k;
+  50              		.loc 1 151 1 view .LVU6
+  51 0006 2B00     		movs	r3, r5
+  52 0008 1032     		adds	r2, r2, #16
+  53              	.LVL1:
+  54              	.L2:
+ 157:byte_mask_aes.c ****   {
+ 158:byte_mask_aes.c ****     roundKey[(i * 4) + 0] = Key[(i * 4) + 0];
+  55              		.loc 1 158 5 is_stmt 1 discriminator 3 view .LVU7
+  56              		.loc 1 158 32 is_stmt 0 discriminator 3 view .LVU8
+  57 000a 0178     		ldrb	r1, [r0]
+  58              		.loc 1 158 27 discriminator 3 view .LVU9
+  59 000c 1970     		strb	r1, [r3]
+ 159:byte_mask_aes.c ****     roundKey[(i * 4) + 1] = Key[(i * 4) + 1];
+  60              		.loc 1 159 5 is_stmt 1 discriminator 3 view .LVU10
+  61              		.loc 1 159 32 is_stmt 0 discriminator 3 view .LVU11
+  62 000e 4178     		ldrb	r1, [r0, #1]
+  63              		.loc 1 159 27 discriminator 3 view .LVU12
+  64 0010 5970     		strb	r1, [r3, #1]
+ 160:byte_mask_aes.c ****     roundKey[(i * 4) + 2] = Key[(i * 4) + 2];
+  65              		.loc 1 160 5 is_stmt 1 discriminator 3 view .LVU13
+  66              		.loc 1 160 32 is_stmt 0 discriminator 3 view .LVU14
+  67 0012 8178     		ldrb	r1, [r0, #2]
+  68              		.loc 1 160 27 discriminator 3 view .LVU15
+  69 0014 9970     		strb	r1, [r3, #2]
+ 161:byte_mask_aes.c ****     roundKey[(i * 4) + 3] = Key[(i * 4) + 3];
+  70              		.loc 1 161 5 is_stmt 1 discriminator 3 view .LVU16
+  71              		.loc 1 161 32 is_stmt 0 discriminator 3 view .LVU17
+  72 0016 C178     		ldrb	r1, [r0, #3]
+ 156:byte_mask_aes.c ****   {
+  73              		.loc 1 156 16 discriminator 3 view .LVU18
+  74 0018 0430     		adds	r0, r0, #4
+  75              		.loc 1 161 27 discriminator 3 view .LVU19
+  76 001a D970     		strb	r1, [r3, #3]
+ 156:byte_mask_aes.c ****   {
+  77              		.loc 1 156 22 is_stmt 1 discriminator 3 view .LVU20
+ 156:byte_mask_aes.c ****   {
+  78              		.loc 1 156 16 discriminator 3 view .LVU21
+  79 001c 0433     		adds	r3, r3, #4
+  80 001e 9042     		cmp	r0, r2
+  81 0020 F3D1     		bne	.L2
+  82 0022 0426     		movs	r6, #4
+  83              	.LVL2:
+  84              	.L3:
+ 162:byte_mask_aes.c ****   }
+ 163:byte_mask_aes.c **** 
+ 164:byte_mask_aes.c ****   // all the key for other key rounds
+ 165:byte_mask_aes.c ****   for(; (i < (Nb * (Nr + 1))); ++i)
+ 166:byte_mask_aes.c ****   {
+ 167:byte_mask_aes.c ****     for(j = 0; j < 4; ++j)
+  85              		.loc 1 167 18 view .LVU22
+ 168:byte_mask_aes.c ****     {
+ 169:byte_mask_aes.c ****       tempa[j]=roundKey[(i-1) * 4 + j];
+  86              		.loc 1 169 15 is_stmt 0 view .LVU23
+  87 0024 2900     		movs	r1, r5
+  88 0026 01AC     		add	r4, sp, #4
+  89 0028 0422     		movs	r2, #4
+  90 002a 2000     		movs	r0, r4
+  91 002c 0C31     		adds	r1, r1, #12
+  92 002e FFF7FEFF 		bl	memcpy
+  93              	.LVL3:
+ 170:byte_mask_aes.c ****     }
+ 171:byte_mask_aes.c **** 
+ 172:byte_mask_aes.c ****     if (i % Nk == 0)
+  94              		.loc 1 172 5 is_stmt 1 view .LVU24
+  95              		.loc 1 172 8 is_stmt 0 view .LVU25
+  96 0032 0323     		movs	r3, #3
+  97 0034 1E42     		tst	r6, r3
+  98 0036 10D1     		bne	.L6
+  99              	.LBB10:
+ 100              	.LBB11:
+ 146:byte_mask_aes.c **** }
+ 101              		.loc 1 146 16 view .LVU26
+ 102 0038 134B     		ldr	r3, .L8+4
+ 103              	.LBE11:
+ 104              	.LBE10:
+ 173:byte_mask_aes.c ****     {
+ 174:byte_mask_aes.c ****       {
+ 175:byte_mask_aes.c ****         k = tempa[0];
+ 105              		.loc 1 175 18 view .LVU27
+ 106 003a 2178     		ldrb	r1, [r4]
+ 176:byte_mask_aes.c ****         tempa[0] = tempa[1];
+ 177:byte_mask_aes.c ****         tempa[1] = tempa[2];
+ 178:byte_mask_aes.c ****         tempa[2] = tempa[3];
+ 107              		.loc 1 178 25 view .LVU28
+ 108 003c E078     		ldrb	r0, [r4, #3]
+ 175:byte_mask_aes.c ****         tempa[0] = tempa[1];
+ 109              		.loc 1 175 9 is_stmt 1 view .LVU29
+ 110              	.LVL4:
+ 176:byte_mask_aes.c ****         tempa[0] = tempa[1];
+ 111              		.loc 1 176 9 view .LVU30
+ 177:byte_mask_aes.c ****         tempa[2] = tempa[3];
+ 112              		.loc 1 177 9 view .LVU31
+ 113              		.loc 1 178 9 view .LVU32
+ 179:byte_mask_aes.c ****         tempa[3] = k;
+ 114              		.loc 1 179 9 view .LVU33
+ 180:byte_mask_aes.c ****       }
+ 181:byte_mask_aes.c **** 
+ 182:byte_mask_aes.c ****       {
+ 183:byte_mask_aes.c ****         tempa[0] = getSBoxValue(tempa[0]);
+ 115              		.loc 1 183 9 view .LVU34
+ 116              	.LBB14:
+ 117              	.LBI10:
+ 144:byte_mask_aes.c **** {
+ 118              		.loc 1 144 16 view .LVU35
+ 119              	.LBB12:
+ 146:byte_mask_aes.c **** }
+ 120              		.loc 1 146 5 view .LVU36
+ 146:byte_mask_aes.c **** }
+ 121              		.loc 1 146 16 is_stmt 0 view .LVU37
+ 122 003e 6278     		ldrb	r2, [r4, #1]
+ 123              	.LBE12:
+ 124              	.LBE14:
+ 125              	.LBB15:
+ 126              	.LBB16:
+ 127 0040 A778     		ldrb	r7, [r4, #2]
+ 128              	.LBE16:
+ 129              	.LBE15:
+ 130              	.LBB18:
+ 131              	.LBB13:
+ 132 0042 9A5C     		ldrb	r2, [r3, r2]
+ 133              	.LVL5:
+ 146:byte_mask_aes.c **** }
+ 134              		.loc 1 146 16 view .LVU38
+ 135              	.LBE13:
+ 136              	.LBE18:
+ 184:byte_mask_aes.c ****         tempa[1] = getSBoxValue(tempa[1]);
+ 137              		.loc 1 184 9 is_stmt 1 view .LVU39
+ 138              	.LBB19:
+ 139              	.LBI15:
+ 144:byte_mask_aes.c **** {
+ 140              		.loc 1 144 16 view .LVU40
+ 141              	.LBB17:
+ 146:byte_mask_aes.c **** }
+ 142              		.loc 1 146 5 view .LVU41
+ 146:byte_mask_aes.c **** }
+ 143              		.loc 1 146 5 is_stmt 0 view .LVU42
+ 144              	.LBE17:
+ 145              	.LBE19:
+ 146              		.loc 1 184 18 view .LVU43
+ 147 0044 DF5D     		ldrb	r7, [r3, r7]
+ 185:byte_mask_aes.c ****         tempa[2] = getSBoxValue(tempa[2]);
+ 148              		.loc 1 185 18 view .LVU44
+ 149 0046 185C     		ldrb	r0, [r3, r0]
+ 186:byte_mask_aes.c ****         tempa[3] = getSBoxValue(tempa[3]);
+ 150              		.loc 1 186 18 view .LVU45
+ 151 0048 5B5C     		ldrb	r3, [r3, r1]
+ 187:byte_mask_aes.c ****       }
+ 188:byte_mask_aes.c **** 
+ 189:byte_mask_aes.c ****       tempa[0] =  tempa[0] ^ Rcon[i/Nk];
+ 152              		.loc 1 189 36 view .LVU46
+ 153 004a B108     		lsrs	r1, r6, #2
+ 186:byte_mask_aes.c ****         tempa[3] = getSBoxValue(tempa[3]);
+ 154              		.loc 1 186 18 view .LVU47
+ 155 004c E370     		strb	r3, [r4, #3]
+ 156              		.loc 1 189 34 view .LVU48
+ 157 004e 0F4B     		ldr	r3, .L8+8
+ 184:byte_mask_aes.c ****         tempa[2] = getSBoxValue(tempa[2]);
+ 158              		.loc 1 184 18 view .LVU49
+ 159 0050 6770     		strb	r7, [r4, #1]
+ 185:byte_mask_aes.c ****         tempa[3] = getSBoxValue(tempa[3]);
+ 160              		.loc 1 185 9 is_stmt 1 view .LVU50
+ 161              	.LVL6:
+ 162              	.LBB20:
+ 163              	.LBI20:
+ 144:byte_mask_aes.c **** {
+ 164              		.loc 1 144 16 view .LVU51
+ 165              	.LBB21:
+ 146:byte_mask_aes.c **** }
+ 166              		.loc 1 146 5 view .LVU52
+ 146:byte_mask_aes.c **** }
+ 167              		.loc 1 146 5 is_stmt 0 view .LVU53
+ 168              	.LBE21:
+ 169              	.LBE20:
+ 170              		.loc 1 189 16 view .LVU54
+ 171 0052 5B5C     		ldrb	r3, [r3, r1]
+ 185:byte_mask_aes.c ****         tempa[3] = getSBoxValue(tempa[3]);
+ 172              		.loc 1 185 18 view .LVU55
+ 173 0054 A070     		strb	r0, [r4, #2]
+ 186:byte_mask_aes.c ****       }
+ 174              		.loc 1 186 9 is_stmt 1 view .LVU56
+ 175              	.LVL7:
+ 176              	.LBB22:
+ 177              	.LBI22:
+ 144:byte_mask_aes.c **** {
+ 178              		.loc 1 144 16 view .LVU57
+ 179              	.LBB23:
+ 146:byte_mask_aes.c **** }
+ 180              		.loc 1 146 5 view .LVU58
+ 146:byte_mask_aes.c **** }
+ 181              		.loc 1 146 5 is_stmt 0 view .LVU59
+ 182              	.LBE23:
+ 183              	.LBE22:
+ 184              		.loc 1 189 7 is_stmt 1 view .LVU60
+ 185              		.loc 1 189 16 is_stmt 0 view .LVU61
+ 186 0056 5340     		eors	r3, r2
+ 187 0058 2370     		strb	r3, [r4]
+ 188              	.LVL8:
+ 189              	.L6:
+ 190:byte_mask_aes.c ****     }
+ 191:byte_mask_aes.c ****     else if (Nk > 6 && i % Nk == 4)
+ 192:byte_mask_aes.c ****     {
+ 193:byte_mask_aes.c ****       {
+ 194:byte_mask_aes.c ****         tempa[0] = getSBoxValue(tempa[0]);
+ 195:byte_mask_aes.c ****         tempa[1] = getSBoxValue(tempa[1]);
+ 196:byte_mask_aes.c ****         tempa[2] = getSBoxValue(tempa[2]);
+ 197:byte_mask_aes.c ****         tempa[3] = getSBoxValue(tempa[3]);
+ 198:byte_mask_aes.c ****       }
+ 199:byte_mask_aes.c ****     }
+ 200:byte_mask_aes.c ****     roundKey[i * 4 + 0] = roundKey[(i - Nk) * 4 + 0] ^ tempa[0];
+ 190              		.loc 1 200 5 is_stmt 1 view .LVU62
+ 191              		.loc 1 200 25 is_stmt 0 view .LVU63
+ 192 005a 2B78     		ldrb	r3, [r5]
+ 193 005c 2278     		ldrb	r2, [r4]
+ 165:byte_mask_aes.c ****   {
+ 194              		.loc 1 165 32 view .LVU64
+ 195 005e 0136     		adds	r6, r6, #1
+ 196              	.LVL9:
+ 197              		.loc 1 200 25 view .LVU65
+ 198 0060 5340     		eors	r3, r2
+ 199 0062 2B74     		strb	r3, [r5, #16]
+ 201:byte_mask_aes.c ****     roundKey[i * 4 + 1] = roundKey[(i - Nk) * 4 + 1] ^ tempa[1];
+ 200              		.loc 1 201 5 is_stmt 1 view .LVU66
+ 201              		.loc 1 201 25 is_stmt 0 view .LVU67
+ 202 0064 6278     		ldrb	r2, [r4, #1]
+ 203 0066 6B78     		ldrb	r3, [r5, #1]
+ 204 0068 5340     		eors	r3, r2
+ 205 006a 6B74     		strb	r3, [r5, #17]
+ 202:byte_mask_aes.c ****     roundKey[i * 4 + 2] = roundKey[(i - Nk) * 4 + 2] ^ tempa[2];
+ 206              		.loc 1 202 5 is_stmt 1 view .LVU68
+ 207              		.loc 1 202 25 is_stmt 0 view .LVU69
+ 208 006c A278     		ldrb	r2, [r4, #2]
+ 209 006e AB78     		ldrb	r3, [r5, #2]
+ 210 0070 5340     		eors	r3, r2
+ 211 0072 AB74     		strb	r3, [r5, #18]
+ 203:byte_mask_aes.c ****     roundKey[i * 4 + 3] = roundKey[(i - Nk) * 4 + 3] ^ tempa[3];
+ 212              		.loc 1 203 5 is_stmt 1 view .LVU70
+ 213              		.loc 1 203 25 is_stmt 0 view .LVU71
+ 214 0074 E278     		ldrb	r2, [r4, #3]
+ 215 0076 EB78     		ldrb	r3, [r5, #3]
+ 165:byte_mask_aes.c ****   {
+ 216              		.loc 1 165 12 view .LVU72
+ 217 0078 0435     		adds	r5, r5, #4
+ 218              		.loc 1 203 25 view .LVU73
+ 219 007a 5340     		eors	r3, r2
+ 220 007c EB73     		strb	r3, [r5, #15]
+ 165:byte_mask_aes.c ****   {
+ 221              		.loc 1 165 32 is_stmt 1 view .LVU74
+ 222              	.LVL10:
+ 165:byte_mask_aes.c ****   {
+ 223              		.loc 1 165 12 view .LVU75
+ 224 007e 2C2E     		cmp	r6, #44
+ 225 0080 D0D1     		bne	.L3
+ 204:byte_mask_aes.c ****   }
+ 205:byte_mask_aes.c **** 
+ 206:byte_mask_aes.c **** }
+ 226              		.loc 1 206 1 is_stmt 0 view .LVU76
+ 227              		@ sp needed
+ 228              	.LVL11:
+ 229              		.loc 1 206 1 view .LVU77
+ 230 0082 F7BD     		pop	{r0, r1, r2, r4, r5, r6, r7, pc}
+ 231              	.L9:
+ 232              		.align	2
+ 233              	.L8:
+ 234 0084 00000000 		.word	roundKey
+ 235 0088 00000000 		.word	sbox
+ 236 008c 00020000 		.word	Rcon
+ 237              		.cfi_endproc
+ 238              	.LFE4:
+ 240              		.section	.text.mixColumns,"ax",%progbits
+ 241              		.align	1
+ 242              		.global	mixColumns
+ 243              		.syntax unified
+ 244              		.code	16
+ 245              		.thumb_func
+ 246              		.fpu softvfp
+ 248              	mixColumns:
+ 249              	.LVL12:
+ 250              	.LFB5:
+ 207:byte_mask_aes.c **** 
+ 208:byte_mask_aes.c **** 
+ 209:byte_mask_aes.c **** void mixColumns(uint8_t state[16]){
+ 251              		.loc 1 209 35 is_stmt 1 view -0
+ 252              		.cfi_startproc
+ 253              		@ args = 0, pretend = 0, frame = 8
+ 254              		@ frame_needed = 0, uses_anonymous_args = 0
+ 210:byte_mask_aes.c **** 
+ 211:byte_mask_aes.c **** //   Normal Mix Columns:
+ 212:byte_mask_aes.c **** //  * [w]      [2  3  1  1]    [a]
+ 213:byte_mask_aes.c **** //  * [x]  =   [1  2  3  1]  * [b]
+ 214:byte_mask_aes.c **** //  * [y]      [1  1  2  3]    [c]
+ 215:byte_mask_aes.c **** //  * [z]      [3  1  1  2]    [d]
+ 216:byte_mask_aes.c **** //  *
+ 217:byte_mask_aes.c **** //  
+ 218:byte_mask_aes.c **** //starttrigger();
+ 219:byte_mask_aes.c ****  
+ 220:byte_mask_aes.c ****     uint8_t temp[4];
+ 255              		.loc 1 220 5 view .LVU79
+ 221:byte_mask_aes.c ****     uint8_t i;
+ 256              		.loc 1 221 5 view .LVU80
+ 222:byte_mask_aes.c ****     for(i = 0; i < 16; i+=4){
+ 257              		.loc 1 222 5 view .LVU81
+ 258              		.loc 1 222 18 view .LVU82
+ 259 0000 0300     		movs	r3, r0
+ 209:byte_mask_aes.c **** 
+ 260              		.loc 1 209 35 is_stmt 0 view .LVU83
+ 261 0002 F7B5     		push	{r0, r1, r2, r4, r5, r6, r7, lr}
+ 262              	.LCFI1:
+ 263              		.cfi_def_cfa_offset 32
+ 264              		.cfi_offset 0, -32
+ 265              		.cfi_offset 1, -28
+ 266              		.cfi_offset 2, -24
+ 267              		.cfi_offset 4, -20
+ 268              		.cfi_offset 5, -16
+ 269              		.cfi_offset 6, -12
+ 270              		.cfi_offset 7, -8
+ 271              		.cfi_offset 14, -4
+ 272 0004 1033     		adds	r3, r3, #16
+ 223:byte_mask_aes.c ****         temp[0] = state[i];
+ 224:byte_mask_aes.c ****         temp[1] = state[i+1];
+ 225:byte_mask_aes.c ****         temp[2] = state[i+2];
+ 226:byte_mask_aes.c ****         temp[3] = state[i+3];
+ 227:byte_mask_aes.c **** 
+ 228:byte_mask_aes.c **** 
+ 229:byte_mask_aes.c ****         state[i]	=	mul_02[temp[0]]	^ mul_03[temp[1]]   ^       temp[2]     ^        temp[3];
+ 273              		.loc 1 229 26 view .LVU84
+ 274 0006 174C     		ldr	r4, .L13
+ 275              		.loc 1 229 44 view .LVU85
+ 276 0008 174E     		ldr	r6, .L13+4
+ 277 000a 0193     		str	r3, [sp, #4]
+ 278              	.LVL13:
+ 279              	.L11:
+ 223:byte_mask_aes.c ****         temp[0] = state[i];
+ 280              		.loc 1 223 9 is_stmt 1 discriminator 3 view .LVU86
+ 225:byte_mask_aes.c ****         temp[3] = state[i+3];
+ 281              		.loc 1 225 24 is_stmt 0 discriminator 3 view .LVU87
+ 282 000c 8778     		ldrb	r7, [r0, #2]
+ 223:byte_mask_aes.c ****         temp[0] = state[i];
+ 283              		.loc 1 223 24 discriminator 3 view .LVU88
+ 284 000e 0578     		ldrb	r5, [r0]
+ 285              	.LVL14:
+ 224:byte_mask_aes.c ****         temp[2] = state[i+2];
+ 286              		.loc 1 224 9 is_stmt 1 discriminator 3 view .LVU89
+ 287              		.loc 1 229 18 is_stmt 0 discriminator 3 view .LVU90
+ 288 0010 3A00     		movs	r2, r7
+ 224:byte_mask_aes.c ****         temp[2] = state[i+2];
+ 289              		.loc 1 224 24 discriminator 3 view .LVU91
+ 290 0012 4378     		ldrb	r3, [r0, #1]
+ 226:byte_mask_aes.c **** 
+ 291              		.loc 1 226 24 discriminator 3 view .LVU92
+ 292 0014 C178     		ldrb	r1, [r0, #3]
+ 224:byte_mask_aes.c ****         temp[2] = state[i+2];
+ 293              		.loc 1 224 24 discriminator 3 view .LVU93
+ 294 0016 0093     		str	r3, [sp]
+ 295              	.LVL15:
+ 225:byte_mask_aes.c ****         temp[3] = state[i+3];
+ 296              		.loc 1 225 9 is_stmt 1 discriminator 3 view .LVU94
+ 226:byte_mask_aes.c **** 
+ 297              		.loc 1 226 9 discriminator 3 view .LVU95
+ 298              		.loc 1 229 9 discriminator 3 view .LVU96
+ 299              		.loc 1 229 18 is_stmt 0 discriminator 3 view .LVU97
+ 300 0018 635D     		ldrb	r3, [r4, r5]
+ 301 001a 4A40     		eors	r2, r1
+ 302 001c 5A40     		eors	r2, r3
+ 303 001e 009B     		ldr	r3, [sp]
+ 304 0020 F35C     		ldrb	r3, [r6, r3]
+ 305 0022 5A40     		eors	r2, r3
+ 306 0024 0270     		strb	r2, [r0]
+ 230:byte_mask_aes.c ****         state[i+1]	=	       temp[0]	^ mul_02[temp[1]]   ^mul_03[temp[2]]    ^        temp[3];
+ 307              		.loc 1 230 9 is_stmt 1 discriminator 3 view .LVU98
+ 308              		.loc 1 230 20 is_stmt 0 discriminator 3 view .LVU99
+ 309 0026 2A00     		movs	r2, r5
+ 310 0028 009B     		ldr	r3, [sp]
+ 311 002a 4A40     		eors	r2, r1
+ 312 002c E35C     		ldrb	r3, [r4, r3]
+ 313 002e 5A40     		eors	r2, r3
+ 314 0030 F35D     		ldrb	r3, [r6, r7]
+ 315 0032 5A40     		eors	r2, r3
+ 316 0034 4270     		strb	r2, [r0, #1]
+ 231:byte_mask_aes.c ****         state[i+2]	=	       temp[0]	^        temp[1]    ^mul_02[temp[2]]    ^mul_03[temp[3]];
+ 317              		.loc 1 231 9 is_stmt 1 discriminator 3 view .LVU100
+ 318              		.loc 1 231 20 is_stmt 0 discriminator 3 view .LVU101
+ 319 0036 2A00     		movs	r2, r5
+ 320 0038 009B     		ldr	r3, [sp]
+ 321 003a 5A40     		eors	r2, r3
+ 322 003c 9446     		mov	ip, r2
+ 323 003e 6346     		mov	r3, ip
+ 324 0040 E25D     		ldrb	r2, [r4, r7]
+ 325 0042 5A40     		eors	r2, r3
+ 326 0044 735C     		ldrb	r3, [r6, r1]
+ 327 0046 5A40     		eors	r2, r3
+ 232:byte_mask_aes.c ****         state[i+3]	=	mul_03[temp[0]]	^        temp[1]    ^       temp[2]     ^mul_02[temp[3]];
+ 328              		.loc 1 232 20 discriminator 3 view .LVU102
+ 329 0048 009B     		ldr	r3, [sp]
+ 231:byte_mask_aes.c ****         state[i+2]	=	       temp[0]	^        temp[1]    ^mul_02[temp[2]]    ^mul_03[temp[3]];
+ 330              		.loc 1 231 20 discriminator 3 view .LVU103
+ 331 004a 8270     		strb	r2, [r0, #2]
+ 332              		.loc 1 232 9 is_stmt 1 discriminator 3 view .LVU104
+ 333              		.loc 1 232 20 is_stmt 0 discriminator 3 view .LVU105
+ 334 004c 725D     		ldrb	r2, [r6, r5]
+ 335 004e 7B40     		eors	r3, r7
+ 336 0050 5340     		eors	r3, r2
+ 337 0052 625C     		ldrb	r2, [r4, r1]
+ 338 0054 5340     		eors	r3, r2
+ 339 0056 C370     		strb	r3, [r0, #3]
+ 222:byte_mask_aes.c ****         temp[0] = state[i];
+ 340              		.loc 1 222 25 is_stmt 1 discriminator 3 view .LVU106
+ 341              	.LVL16:
+ 222:byte_mask_aes.c ****         temp[0] = state[i];
+ 342              		.loc 1 222 18 discriminator 3 view .LVU107
+ 343 0058 019B     		ldr	r3, [sp, #4]
+ 344 005a 0430     		adds	r0, r0, #4
+ 345              	.LVL17:
+ 222:byte_mask_aes.c ****         temp[0] = state[i];
+ 346              		.loc 1 222 18 is_stmt 0 discriminator 3 view .LVU108
+ 347 005c 8342     		cmp	r3, r0
+ 348 005e D5D1     		bne	.L11
+ 233:byte_mask_aes.c **** 
+ 234:byte_mask_aes.c ****     }
+ 235:byte_mask_aes.c **** //endtrigger();
+ 236:byte_mask_aes.c **** }
+ 349              		.loc 1 236 1 view .LVU109
+ 350              		@ sp needed
+ 351              	.LVL18:
+ 352              	.LVL19:
+ 353              		.loc 1 236 1 view .LVU110
+ 354 0060 F7BD     		pop	{r0, r1, r2, r4, r5, r6, r7, pc}
+ 355              	.L14:
+ 356 0062 C046     		.align	2
+ 357              	.L13:
+ 358 0064 00000000 		.word	mul_02
+ 359 0068 00000000 		.word	mul_03
+ 360              		.cfi_endproc
+ 361              	.LFE5:
+ 363              		.section	.text.shiftRows,"ax",%progbits
+ 364              		.align	1
+ 365              		.global	shiftRows
+ 366              		.syntax unified
+ 367              		.code	16
+ 368              		.thumb_func
+ 369              		.fpu softvfp
+ 371              	shiftRows:
+ 372              	.LVL20:
+ 373              	.LFB6:
+ 237:byte_mask_aes.c **** 
+ 238:byte_mask_aes.c **** //#define ROR32(x,y) ((uint32_t)(x) >> (y) | (uint32_t)(x) << 32 - (y))
+ 239:byte_mask_aes.c **** 
+ 240:byte_mask_aes.c **** //uint32_t ror32(uint32_t x, uint32_t y)
+ 241:byte_mask_aes.c **** //{
+ 242:byte_mask_aes.c **** //    return ((uint32_t)(x) >> (y) | (uint32_t)(x) << 32 - (y)) ;
+ 243:byte_mask_aes.c **** //}
+ 244:byte_mask_aes.c **** 
+ 245:byte_mask_aes.c **** void shiftRows(uint8_t state[16])
+ 246:byte_mask_aes.c **** {
+ 374              		.loc 1 246 1 is_stmt 1 view -0
+ 375              		.cfi_startproc
+ 376              		@ args = 0, pretend = 0, frame = 0
+ 377              		@ frame_needed = 0, uses_anonymous_args = 0
+ 378              		@ link register save eliminated.
+ 247:byte_mask_aes.c ****     uint8_t temp;
+ 379              		.loc 1 247 5 view .LVU112
+ 248:byte_mask_aes.c ****     //Row 2
+ 249:byte_mask_aes.c ****     temp = state[1];
+ 380              		.loc 1 249 5 view .LVU113
+ 250:byte_mask_aes.c ****     state[1] = state[5];
+ 381              		.loc 1 250 14 is_stmt 0 view .LVU114
+ 382 0000 4279     		ldrb	r2, [r0, #5]
+ 249:byte_mask_aes.c ****     state[1] = state[5];
+ 383              		.loc 1 249 10 view .LVU115
+ 384 0002 4378     		ldrb	r3, [r0, #1]
+ 385              	.LVL21:
+ 386              		.loc 1 250 5 is_stmt 1 view .LVU116
+ 387              		.loc 1 250 14 is_stmt 0 view .LVU117
+ 388 0004 4270     		strb	r2, [r0, #1]
+ 251:byte_mask_aes.c ****     state[5] = state[9];
+ 389              		.loc 1 251 5 is_stmt 1 view .LVU118
+ 390              		.loc 1 251 14 is_stmt 0 view .LVU119
+ 391 0006 427A     		ldrb	r2, [r0, #9]
+ 252:byte_mask_aes.c ****     state[9] = state[13];
+ 253:byte_mask_aes.c ****     state[13] = temp;
+ 254:byte_mask_aes.c ****     //Row 3
+ 255:byte_mask_aes.c ****     temp = state[10];
+ 256:byte_mask_aes.c ****     state[10] = state[2];
+ 257:byte_mask_aes.c ****     state[2] = temp;
+ 258:byte_mask_aes.c ****     temp = state[14];
+ 259:byte_mask_aes.c ****     state[14] = state[6];
+ 260:byte_mask_aes.c ****     state[6] = temp;
+ 261:byte_mask_aes.c ****     //Row 4
+ 262:byte_mask_aes.c ****     temp = state[3];
+ 263:byte_mask_aes.c ****     state[3] = state[15];
+ 264:byte_mask_aes.c ****     state[15] = state[11];
+ 265:byte_mask_aes.c ****     state[11] = state[7];
+ 266:byte_mask_aes.c ****     state[7] = temp;
+ 267:byte_mask_aes.c ****     temp = 0;
+ 268:byte_mask_aes.c **** }
+ 392              		.loc 1 268 1 view .LVU120
+ 393              		@ sp needed
+ 251:byte_mask_aes.c ****     state[5] = state[9];
+ 394              		.loc 1 251 14 view .LVU121
+ 395 0008 4271     		strb	r2, [r0, #5]
+ 252:byte_mask_aes.c ****     state[9] = state[13];
+ 396              		.loc 1 252 5 is_stmt 1 view .LVU122
+ 252:byte_mask_aes.c ****     state[9] = state[13];
+ 397              		.loc 1 252 14 is_stmt 0 view .LVU123
+ 398 000a 427B     		ldrb	r2, [r0, #13]
+ 253:byte_mask_aes.c ****     //Row 3
+ 399              		.loc 1 253 15 view .LVU124
+ 400 000c 4373     		strb	r3, [r0, #13]
+ 252:byte_mask_aes.c ****     state[9] = state[13];
+ 401              		.loc 1 252 14 view .LVU125
+ 402 000e 4272     		strb	r2, [r0, #9]
+ 253:byte_mask_aes.c ****     //Row 3
+ 403              		.loc 1 253 5 is_stmt 1 view .LVU126
+ 255:byte_mask_aes.c ****     state[10] = state[2];
+ 404              		.loc 1 255 5 view .LVU127
+ 256:byte_mask_aes.c ****     state[2] = temp;
+ 405              		.loc 1 256 15 is_stmt 0 view .LVU128
+ 406 0010 8278     		ldrb	r2, [r0, #2]
+ 255:byte_mask_aes.c ****     state[10] = state[2];
+ 407              		.loc 1 255 10 view .LVU129
+ 408 0012 837A     		ldrb	r3, [r0, #10]
+ 409              	.LVL22:
+ 256:byte_mask_aes.c ****     state[2] = temp;
+ 410              		.loc 1 256 5 is_stmt 1 view .LVU130
+ 256:byte_mask_aes.c ****     state[2] = temp;
+ 411              		.loc 1 256 15 is_stmt 0 view .LVU131
+ 412 0014 8272     		strb	r2, [r0, #10]
+ 257:byte_mask_aes.c ****     temp = state[14];
+ 413              		.loc 1 257 5 is_stmt 1 view .LVU132
+ 259:byte_mask_aes.c ****     state[6] = temp;
+ 414              		.loc 1 259 15 is_stmt 0 view .LVU133
+ 415 0016 8279     		ldrb	r2, [r0, #6]
+ 257:byte_mask_aes.c ****     temp = state[14];
+ 416              		.loc 1 257 14 view .LVU134
+ 417 0018 8370     		strb	r3, [r0, #2]
+ 258:byte_mask_aes.c ****     state[14] = state[6];
+ 418              		.loc 1 258 5 is_stmt 1 view .LVU135
+ 258:byte_mask_aes.c ****     state[14] = state[6];
+ 419              		.loc 1 258 10 is_stmt 0 view .LVU136
+ 420 001a 837B     		ldrb	r3, [r0, #14]
+ 421              	.LVL23:
+ 259:byte_mask_aes.c ****     state[6] = temp;
+ 422              		.loc 1 259 5 is_stmt 1 view .LVU137
+ 259:byte_mask_aes.c ****     state[6] = temp;
+ 423              		.loc 1 259 15 is_stmt 0 view .LVU138
+ 424 001c 8273     		strb	r2, [r0, #14]
+ 260:byte_mask_aes.c ****     //Row 4
+ 425              		.loc 1 260 5 is_stmt 1 view .LVU139
+ 263:byte_mask_aes.c ****     state[15] = state[11];
+ 426              		.loc 1 263 14 is_stmt 0 view .LVU140
+ 427 001e C27B     		ldrb	r2, [r0, #15]
+ 260:byte_mask_aes.c ****     //Row 4
+ 428              		.loc 1 260 14 view .LVU141
+ 429 0020 8371     		strb	r3, [r0, #6]
+ 262:byte_mask_aes.c ****     state[3] = state[15];
+ 430              		.loc 1 262 5 is_stmt 1 view .LVU142
+ 262:byte_mask_aes.c ****     state[3] = state[15];
+ 431              		.loc 1 262 10 is_stmt 0 view .LVU143
+ 432 0022 C378     		ldrb	r3, [r0, #3]
+ 433              	.LVL24:
+ 263:byte_mask_aes.c ****     state[15] = state[11];
+ 434              		.loc 1 263 5 is_stmt 1 view .LVU144
+ 263:byte_mask_aes.c ****     state[15] = state[11];
+ 435              		.loc 1 263 14 is_stmt 0 view .LVU145
+ 436 0024 C270     		strb	r2, [r0, #3]
+ 264:byte_mask_aes.c ****     state[11] = state[7];
+ 437              		.loc 1 264 5 is_stmt 1 view .LVU146
+ 264:byte_mask_aes.c ****     state[11] = state[7];
+ 438              		.loc 1 264 15 is_stmt 0 view .LVU147
+ 439 0026 C27A     		ldrb	r2, [r0, #11]
+ 440 0028 C273     		strb	r2, [r0, #15]
+ 265:byte_mask_aes.c ****     state[7] = temp;
+ 441              		.loc 1 265 5 is_stmt 1 view .LVU148
+ 265:byte_mask_aes.c ****     state[7] = temp;
+ 442              		.loc 1 265 15 is_stmt 0 view .LVU149
+ 443 002a C279     		ldrb	r2, [r0, #7]
+ 266:byte_mask_aes.c ****     temp = 0;
+ 444              		.loc 1 266 14 view .LVU150
+ 445 002c C371     		strb	r3, [r0, #7]
+ 265:byte_mask_aes.c ****     state[7] = temp;
+ 446              		.loc 1 265 15 view .LVU151
+ 447 002e C272     		strb	r2, [r0, #11]
+ 266:byte_mask_aes.c ****     temp = 0;
+ 448              		.loc 1 266 5 is_stmt 1 view .LVU152
+ 267:byte_mask_aes.c **** }
+ 449              		.loc 1 267 5 view .LVU153
+ 450              	.LVL25:
+ 451              		.loc 1 268 1 is_stmt 0 view .LVU154
+ 452 0030 7047     		bx	lr
+ 453              		.cfi_endproc
+ 454              	.LFE6:
+ 456              		.section	.text.addRoundKey_masked,"ax",%progbits
+ 457              		.align	1
+ 458              		.global	addRoundKey_masked
+ 459              		.syntax unified
+ 460              		.code	16
+ 461              		.thumb_func
+ 462              		.fpu softvfp
+ 464              	addRoundKey_masked:
+ 465              	.LVL26:
+ 466              	.LFB7:
+ 269:byte_mask_aes.c **** 
+ 270:byte_mask_aes.c **** 
+ 271:byte_mask_aes.c **** void addRoundKey_masked(uint8_t state[16],uint8_t round){
+ 467              		.loc 1 271 57 is_stmt 1 view -0
+ 468              		.cfi_startproc
+ 469              		@ args = 0, pretend = 0, frame = 0
+ 470              		@ frame_needed = 0, uses_anonymous_args = 0
+ 272:byte_mask_aes.c **** 	uint8_t i;
+ 471              		.loc 1 272 2 view .LVU156
+ 273:byte_mask_aes.c **** 	for(i=0;i<16;i++){
+ 472              		.loc 1 273 2 view .LVU157
+ 473              		.loc 1 273 11 view .LVU158
+ 474 0000 064B     		ldr	r3, .L19
+ 475 0002 0901     		lsls	r1, r1, #4
+ 476              	.LVL27:
+ 477              		.loc 1 273 11 is_stmt 0 view .LVU159
+ 478 0004 C918     		adds	r1, r1, r3
+ 271:byte_mask_aes.c **** 	uint8_t i;
+ 479              		.loc 1 271 57 view .LVU160
+ 480 0006 0023     		movs	r3, #0
+ 481 0008 10B5     		push	{r4, lr}
+ 482              	.LCFI2:
+ 483              		.cfi_def_cfa_offset 8
+ 484              		.cfi_offset 4, -8
+ 485              		.cfi_offset 14, -4
+ 486              	.LVL28:
+ 487              	.L17:
+ 274:byte_mask_aes.c **** 		state[i] ^= RoundKey_masked[round][i];
+ 488              		.loc 1 274 3 is_stmt 1 discriminator 3 view .LVU161
+ 489              		.loc 1 274 12 is_stmt 0 discriminator 3 view .LVU162
+ 490 000a C25C     		ldrb	r2, [r0, r3]
+ 491 000c CC5C     		ldrb	r4, [r1, r3]
+ 492 000e 6240     		eors	r2, r4
+ 493 0010 C254     		strb	r2, [r0, r3]
+ 273:byte_mask_aes.c **** 	for(i=0;i<16;i++){
+ 494              		.loc 1 273 16 is_stmt 1 discriminator 3 view .LVU163
+ 495              	.LVL29:
+ 273:byte_mask_aes.c **** 	for(i=0;i<16;i++){
+ 496              		.loc 1 273 11 discriminator 3 view .LVU164
+ 497 0012 0133     		adds	r3, r3, #1
+ 498              	.LVL30:
+ 273:byte_mask_aes.c **** 	for(i=0;i<16;i++){
+ 499              		.loc 1 273 11 is_stmt 0 discriminator 3 view .LVU165
+ 500 0014 102B     		cmp	r3, #16
+ 501 0016 F8D1     		bne	.L17
+ 275:byte_mask_aes.c **** 	}
+ 276:byte_mask_aes.c **** }
+ 502              		.loc 1 276 1 view .LVU166
+ 503              		@ sp needed
+ 504 0018 10BD     		pop	{r4, pc}
+ 505              	.L20:
+ 506 001a C046     		.align	2
+ 507              	.L19:
+ 508 001c 00000000 		.word	RoundKey_masked
+ 509              		.cfi_endproc
+ 510              	.LFE7:
+ 512              		.section	.text.masked,"ax",%progbits
+ 513              		.align	1
+ 514              		.global	masked
+ 515              		.syntax unified
+ 516              		.code	16
+ 517              		.thumb_func
+ 518              		.fpu softvfp
+ 520              	masked:
+ 521              	.LVL31:
+ 522              	.LFB8:
+ 277:byte_mask_aes.c **** 
+ 278:byte_mask_aes.c **** void masked(uint8_t state[16]){
+ 523              		.loc 1 278 31 is_stmt 1 view -0
+ 524              		.cfi_startproc
+ 525              		@ args = 0, pretend = 0, frame = 0
+ 526              		@ frame_needed = 0, uses_anonymous_args = 0
+ 527              		@ link register save eliminated.
+ 279:byte_mask_aes.c **** 
+ 280:byte_mask_aes.c **** 	uint8_t i;
+ 528              		.loc 1 280 2 view .LVU168
+ 281:byte_mask_aes.c **** 	for (i = 0; i < 16; i++) {
+ 529              		.loc 1 281 2 view .LVU169
+ 530              		.loc 1 281 16 view .LVU170
+ 531 0000 0300     		movs	r3, r0
+ 282:byte_mask_aes.c **** 		state[i] = Sbox_masked[state[i]];
+ 532              		.loc 1 282 25 is_stmt 0 view .LVU171
+ 533 0002 0449     		ldr	r1, .L24
+ 534 0004 1033     		adds	r3, r3, #16
+ 535              	.LVL32:
+ 536              	.L22:
+ 537              		.loc 1 282 3 is_stmt 1 discriminator 3 view .LVU172
+ 538              		.loc 1 282 31 is_stmt 0 discriminator 3 view .LVU173
+ 539 0006 0278     		ldrb	r2, [r0]
+ 540              		.loc 1 282 25 discriminator 3 view .LVU174
+ 541 0008 8A5C     		ldrb	r2, [r1, r2]
+ 542              		.loc 1 282 12 discriminator 3 view .LVU175
+ 543 000a 0270     		strb	r2, [r0]
+ 281:byte_mask_aes.c **** 	for (i = 0; i < 16; i++) {
+ 544              		.loc 1 281 23 is_stmt 1 discriminator 3 view .LVU176
+ 545              	.LVL33:
+ 281:byte_mask_aes.c **** 	for (i = 0; i < 16; i++) {
+ 546              		.loc 1 281 16 discriminator 3 view .LVU177
+ 547 000c 0130     		adds	r0, r0, #1
+ 548              	.LVL34:
+ 281:byte_mask_aes.c **** 	for (i = 0; i < 16; i++) {
+ 549              		.loc 1 281 16 is_stmt 0 discriminator 3 view .LVU178
+ 550 000e 9842     		cmp	r0, r3
+ 551 0010 F9D1     		bne	.L22
+ 283:byte_mask_aes.c **** 	}
+ 284:byte_mask_aes.c **** 
+ 285:byte_mask_aes.c **** }
+ 552              		.loc 1 285 1 view .LVU179
+ 553              		@ sp needed
+ 554 0012 7047     		bx	lr
+ 555              	.L25:
+ 556              		.align	2
+ 557              	.L24:
+ 558 0014 00000000 		.word	Sbox_masked
+ 559              		.cfi_endproc
+ 560              	.LFE8:
+ 562              		.section	.text.remask,"ax",%progbits
+ 563              		.align	1
+ 564              		.global	remask
+ 565              		.syntax unified
+ 566              		.code	16
+ 567              		.thumb_func
+ 568              		.fpu softvfp
+ 570              	remask:
+ 571              	.LVL35:
+ 572              	.LFB9:
+ 286:byte_mask_aes.c **** 
+ 287:byte_mask_aes.c **** void remask(uint8_t s[16], uint8_t m1, uint8_t m2, uint8_t m3, uint8_t m4, uint8_t m5, uint8_t m6, 
+ 573              		.loc 1 287 123 is_stmt 1 view -0
+ 574              		.cfi_startproc
+ 575              		@ args = 20, pretend = 0, frame = 8
+ 576              		@ frame_needed = 0, uses_anonymous_args = 0
+ 288:byte_mask_aes.c **** 
+ 289:byte_mask_aes.c ****   uint8_t masks[4] = {(m1^m5), (m2^m6), (m3^m7), (m4^m8)};
+ 577              		.loc 1 289 3 view .LVU181
+ 287:byte_mask_aes.c **** 
+ 578              		.loc 1 287 123 is_stmt 0 view .LVU182
+ 579 0000 F7B5     		push	{r0, r1, r2, r4, r5, r6, r7, lr}
+ 580              	.LCFI3:
+ 581              		.cfi_def_cfa_offset 32
+ 582              		.cfi_offset 0, -32
+ 583              		.cfi_offset 1, -28
+ 584              		.cfi_offset 2, -24
+ 585              		.cfi_offset 4, -20
+ 586              		.cfi_offset 5, -16
+ 587              		.cfi_offset 6, -12
+ 588              		.cfi_offset 7, -8
+ 589              		.cfi_offset 14, -4
+ 287:byte_mask_aes.c **** 
+ 590              		.loc 1 287 123 view .LVU183
+ 591 0002 08AC     		add	r4, sp, #32
+ 592              	.LVL36:
+ 287:byte_mask_aes.c **** 
+ 593              		.loc 1 287 123 view .LVU184
+ 594 0004 2578     		ldrb	r5, [r4]
+ 595 0006 09AC     		add	r4, sp, #36
+ 596              	.LVL37:
+ 287:byte_mask_aes.c **** 
+ 597              		.loc 1 287 123 view .LVU185
+ 598 0008 2478     		ldrb	r4, [r4]
+ 599              	.LVL38:
+ 287:byte_mask_aes.c **** 
+ 600              		.loc 1 287 123 view .LVU186
+ 601 000a 0193     		str	r3, [sp, #4]
+ 602 000c A446     		mov	ip, r4
+ 603              		.loc 1 289 11 view .LVU187
+ 604 000e 6346     		mov	r3, ip
+ 605              	.LVL39:
+ 287:byte_mask_aes.c **** 
+ 606              		.loc 1 287 123 view .LVU188
+ 607 0010 0AAC     		add	r4, sp, #40
+ 608              	.LVL40:
+ 287:byte_mask_aes.c **** 
+ 609              		.loc 1 287 123 view .LVU189
+ 610 0012 2778     		ldrb	r7, [r4]
+ 611 0014 0BAC     		add	r4, sp, #44
+ 612              	.LVL41:
+ 287:byte_mask_aes.c **** 
+ 613              		.loc 1 287 123 view .LVU190
+ 614 0016 2678     		ldrb	r6, [r4]
+ 615              		.loc 1 289 11 view .LVU191
+ 616 0018 5940     		eors	r1, r3
+ 617              	.LVL42:
+ 618              		.loc 1 289 11 view .LVU192
+ 619 001a 019B     		ldr	r3, [sp, #4]
+ 287:byte_mask_aes.c **** 
+ 620              		.loc 1 287 123 view .LVU193
+ 621 001c 0CAC     		add	r4, sp, #48
+ 622              	.LVL43:
+ 623              		.loc 1 289 11 view .LVU194
+ 624 001e 7340     		eors	r3, r6
+ 625 0020 0600     		movs	r6, r0
+ 287:byte_mask_aes.c **** 
+ 626              		.loc 1 287 123 view .LVU195
+ 627 0022 2478     		ldrb	r4, [r4]
+ 628              	.LVL44:
+ 629              		.loc 1 289 11 view .LVU196
+ 630 0024 7A40     		eors	r2, r7
+ 631              	.LVL45:
+ 632              		.loc 1 289 11 view .LVU197
+ 633 0026 6540     		eors	r5, r4
+ 634              	.LVL46:
+ 290:byte_mask_aes.c ****   int i;
+ 635              		.loc 1 290 3 is_stmt 1 view .LVU198
+ 291:byte_mask_aes.c **** 	for(i = 0; i< 4; i++){
+ 636              		.loc 1 291 2 view .LVU199
+ 637              		.loc 1 291 14 view .LVU200
+ 638 0028 1036     		adds	r6, r6, #16
+ 639              	.LVL47:
+ 640              	.L27:
+ 292:byte_mask_aes.c ****         s[0+i*4]  = s[0+i*4] ^ masks[0];
+ 641              		.loc 1 292 9 discriminator 3 view .LVU201
+ 642              		.loc 1 292 19 is_stmt 0 discriminator 3 view .LVU202
+ 643 002a 0478     		ldrb	r4, [r0]
+ 644 002c 4C40     		eors	r4, r1
+ 645 002e 0470     		strb	r4, [r0]
+ 293:byte_mask_aes.c **** 		s[1+i*4]	= s[1+i*4] ^ masks[1];
+ 646              		.loc 1 293 3 is_stmt 1 discriminator 3 view .LVU203
+ 647              		.loc 1 293 12 is_stmt 0 discriminator 3 view .LVU204
+ 648 0030 4478     		ldrb	r4, [r0, #1]
+ 649 0032 5440     		eors	r4, r2
+ 650 0034 4470     		strb	r4, [r0, #1]
+ 294:byte_mask_aes.c **** 		s[2+i*4]	= s[2+i*4] ^ masks[2];
+ 651              		.loc 1 294 3 is_stmt 1 discriminator 3 view .LVU205
+ 652              		.loc 1 294 12 is_stmt 0 discriminator 3 view .LVU206
+ 653 0036 8478     		ldrb	r4, [r0, #2]
+ 654 0038 5C40     		eors	r4, r3
+ 655 003a 8470     		strb	r4, [r0, #2]
+ 295:byte_mask_aes.c **** 		s[3+i*4]	= s[3+i*4] ^ masks[3];
+ 656              		.loc 1 295 3 is_stmt 1 discriminator 3 view .LVU207
+ 657              		.loc 1 295 12 is_stmt 0 discriminator 3 view .LVU208
+ 658 003c C478     		ldrb	r4, [r0, #3]
+ 659 003e 6C40     		eors	r4, r5
+ 660 0040 C470     		strb	r4, [r0, #3]
+ 291:byte_mask_aes.c ****         s[0+i*4]  = s[0+i*4] ^ masks[0];
+ 661              		.loc 1 291 20 is_stmt 1 discriminator 3 view .LVU209
+ 291:byte_mask_aes.c ****         s[0+i*4]  = s[0+i*4] ^ masks[0];
+ 662              		.loc 1 291 14 discriminator 3 view .LVU210
+ 663 0042 0430     		adds	r0, r0, #4
+ 664 0044 B042     		cmp	r0, r6
+ 665 0046 F0D1     		bne	.L27
+ 296:byte_mask_aes.c **** 	}
+ 297:byte_mask_aes.c **** }
+ 666              		.loc 1 297 1 is_stmt 0 view .LVU211
+ 667              		@ sp needed
+ 668              	.LVL48:
+ 669              	.LVL49:
+ 670              		.loc 1 297 1 view .LVU212
+ 671 0048 F7BD     		pop	{r0, r1, r2, r4, r5, r6, r7, pc}
+ 672              		.cfi_endproc
+ 673              	.LFE9:
+ 675              		.section	.text.calcMixColMask,"ax",%progbits
+ 676              		.align	1
+ 677              		.global	calcMixColMask
+ 678              		.syntax unified
+ 679              		.code	16
+ 680              		.thumb_func
+ 681              		.fpu softvfp
+ 683              	calcMixColMask:
+ 684              	.LFB10:
+ 298:byte_mask_aes.c **** 
+ 299:byte_mask_aes.c **** 
+ 300:byte_mask_aes.c **** //PRECALCULATIONS:
+ 301:byte_mask_aes.c **** //Yuan
+ 302:byte_mask_aes.c **** void calcMixColMask(){
+ 685              		.loc 1 302 22 is_stmt 1 view -0
+ 686              		.cfi_startproc
+ 687              		@ args = 0, pretend = 0, frame = 8
+ 688              		@ frame_needed = 0, uses_anonymous_args = 0
+ 303:byte_mask_aes.c **** 
+ 304:byte_mask_aes.c **** //yuan
+ 305:byte_mask_aes.c **** //  Normal Mix Columns:
+ 306:byte_mask_aes.c **** //  * [w]      [2  3  1  1]    [a]
+ 307:byte_mask_aes.c **** //  * [x]  =   [1  2  3  1]  * [b]
+ 308:byte_mask_aes.c **** //  * [y]      [1  1  2  3]    [c]
+ 309:byte_mask_aes.c **** //  * [z]      [3  1  1  2]    [d]
+ 310:byte_mask_aes.c **** 
+ 311:byte_mask_aes.c **** 	Mask[6]	=	mul_02[Mask[0]]	^ mul_03[Mask[1]]   ^Mask[2]	^Mask[3];
+ 689              		.loc 1 311 2 view .LVU214
+ 302:byte_mask_aes.c **** 
+ 690              		.loc 1 302 22 is_stmt 0 view .LVU215
+ 691 0000 F7B5     		push	{r0, r1, r2, r4, r5, r6, r7, lr}
+ 692              	.LCFI4:
+ 693              		.cfi_def_cfa_offset 32
+ 694              		.cfi_offset 0, -32
+ 695              		.cfi_offset 1, -28
+ 696              		.cfi_offset 2, -24
+ 697              		.cfi_offset 4, -20
+ 698              		.cfi_offset 5, -16
+ 699              		.cfi_offset 6, -12
+ 700              		.cfi_offset 7, -8
+ 701              		.cfi_offset 14, -4
+ 702              		.loc 1 311 23 view .LVU216
+ 703 0002 144B     		ldr	r3, .L30
+ 704              		.loc 1 311 18 view .LVU217
+ 705 0004 144A     		ldr	r2, .L30+4
+ 706              		.loc 1 311 53 view .LVU218
+ 707 0006 9F78     		ldrb	r7, [r3, #2]
+ 708              		.loc 1 311 23 view .LVU219
+ 709 0008 1D78     		ldrb	r5, [r3]
+ 710              		.loc 1 311 10 view .LVU220
+ 711 000a 3E00     		movs	r6, r7
+ 312:byte_mask_aes.c **** 	Mask[7]	=	Mask[0]	^ mul_02[Mask[1]]	^mul_03[Mask[2]]	^Mask[3];
+ 313:byte_mask_aes.c **** 	Mask[8]	=	Mask[0]	^ Mask[1]	^mul_02[Mask[2]]	^mul_03[Mask[3]];
+ 314:byte_mask_aes.c **** 	Mask[9]	=	mul_03[Mask[0]]	^ Mask[1]	^Mask[2]	^mul_02[Mask[3]];
+ 315:byte_mask_aes.c **** 
+ 316:byte_mask_aes.c **** }
+ 712              		.loc 1 316 1 view .LVU221
+ 713              		@ sp needed
+ 311:byte_mask_aes.c **** 	Mask[7]	=	Mask[0]	^ mul_02[Mask[1]]	^mul_03[Mask[2]]	^Mask[3];
+ 714              		.loc 1 311 62 view .LVU222
+ 715 000c DC78     		ldrb	r4, [r3, #3]
+ 311:byte_mask_aes.c **** 	Mask[7]	=	Mask[0]	^ mul_02[Mask[1]]	^mul_03[Mask[2]]	^Mask[3];
+ 716              		.loc 1 311 10 view .LVU223
+ 717 000e 505D     		ldrb	r0, [r2, r5]
+ 718 0010 6640     		eors	r6, r4
+ 311:byte_mask_aes.c **** 	Mask[7]	=	Mask[0]	^ mul_02[Mask[1]]	^mul_03[Mask[2]]	^Mask[3];
+ 719              		.loc 1 311 41 view .LVU224
+ 720 0012 5978     		ldrb	r1, [r3, #1]
+ 311:byte_mask_aes.c **** 	Mask[7]	=	Mask[0]	^ mul_02[Mask[1]]	^mul_03[Mask[2]]	^Mask[3];
+ 721              		.loc 1 311 10 view .LVU225
+ 722 0014 7040     		eors	r0, r6
+ 311:byte_mask_aes.c **** 	Mask[7]	=	Mask[0]	^ mul_02[Mask[1]]	^mul_03[Mask[2]]	^Mask[3];
+ 723              		.loc 1 311 36 view .LVU226
+ 724 0016 114E     		ldr	r6, .L30+8
+ 311:byte_mask_aes.c **** 	Mask[7]	=	Mask[0]	^ mul_02[Mask[1]]	^mul_03[Mask[2]]	^Mask[3];
+ 725              		.loc 1 311 10 view .LVU227
+ 726 0018 0192     		str	r2, [sp, #4]
+ 727 001a 725C     		ldrb	r2, [r6, r1]
+ 728 001c 5040     		eors	r0, r2
+ 729 001e 9871     		strb	r0, [r3, #6]
+ 312:byte_mask_aes.c **** 	Mask[7]	=	Mask[0]	^ mul_02[Mask[1]]	^mul_03[Mask[2]]	^Mask[3];
+ 730              		.loc 1 312 2 is_stmt 1 view .LVU228
+ 312:byte_mask_aes.c **** 	Mask[7]	=	Mask[0]	^ mul_02[Mask[1]]	^mul_03[Mask[2]]	^Mask[3];
+ 731              		.loc 1 312 10 is_stmt 0 view .LVU229
+ 732 0020 2800     		movs	r0, r5
+ 733 0022 6040     		eors	r0, r4
+ 734 0024 8446     		mov	ip, r0
+ 735 0026 019A     		ldr	r2, [sp, #4]
+ 736 0028 505C     		ldrb	r0, [r2, r1]
+ 737 002a 6246     		mov	r2, ip
+ 738 002c 5040     		eors	r0, r2
+ 739 002e F25D     		ldrb	r2, [r6, r7]
+ 740 0030 5040     		eors	r0, r2
+ 741 0032 D871     		strb	r0, [r3, #7]
+ 313:byte_mask_aes.c **** 	Mask[9]	=	mul_03[Mask[0]]	^ Mask[1]	^Mask[2]	^mul_02[Mask[3]];
+ 742              		.loc 1 313 2 is_stmt 1 view .LVU230
+ 313:byte_mask_aes.c **** 	Mask[9]	=	mul_03[Mask[0]]	^ Mask[1]	^Mask[2]	^mul_02[Mask[3]];
+ 743              		.loc 1 313 10 is_stmt 0 view .LVU231
+ 744 0034 2800     		movs	r0, r5
+ 745 0036 019A     		ldr	r2, [sp, #4]
+ 746 0038 4840     		eors	r0, r1
+ 747 003a D25D     		ldrb	r2, [r2, r7]
+ 314:byte_mask_aes.c **** 
+ 748              		.loc 1 314 10 view .LVU232
+ 749 003c 7940     		eors	r1, r7
+ 313:byte_mask_aes.c **** 	Mask[9]	=	mul_03[Mask[0]]	^ Mask[1]	^Mask[2]	^mul_02[Mask[3]];
+ 750              		.loc 1 313 10 view .LVU233
+ 751 003e 5040     		eors	r0, r2
+ 752 0040 325D     		ldrb	r2, [r6, r4]
+ 753 0042 5040     		eors	r0, r2
+ 314:byte_mask_aes.c **** 
+ 754              		.loc 1 314 10 view .LVU234
+ 755 0044 019A     		ldr	r2, [sp, #4]
+ 313:byte_mask_aes.c **** 	Mask[9]	=	mul_03[Mask[0]]	^ Mask[1]	^Mask[2]	^mul_02[Mask[3]];
+ 756              		.loc 1 313 10 view .LVU235
+ 757 0046 1872     		strb	r0, [r3, #8]
+ 314:byte_mask_aes.c **** 
+ 758              		.loc 1 314 2 is_stmt 1 view .LVU236
+ 314:byte_mask_aes.c **** 
+ 759              		.loc 1 314 10 is_stmt 0 view .LVU237
+ 760 0048 705D     		ldrb	r0, [r6, r5]
+ 761 004a 125D     		ldrb	r2, [r2, r4]
+ 762 004c 4140     		eors	r1, r0
+ 763 004e 4A40     		eors	r2, r1
+ 764 0050 5A72     		strb	r2, [r3, #9]
+ 765              		.loc 1 316 1 view .LVU238
+ 766 0052 F7BD     		pop	{r0, r1, r2, r4, r5, r6, r7, pc}
+ 767              	.L31:
+ 768              		.align	2
+ 769              	.L30:
+ 770 0054 00000000 		.word	.LANCHOR0
+ 771 0058 00000000 		.word	mul_02
+ 772 005c 00000000 		.word	mul_03
+ 773              		.cfi_endproc
+ 774              	.LFE10:
+ 776              		.section	.text.calcSbox_masked,"ax",%progbits
+ 777              		.align	1
+ 778              		.global	calcSbox_masked
+ 779              		.syntax unified
+ 780              		.code	16
+ 781              		.thumb_func
+ 782              		.fpu softvfp
+ 784              	calcSbox_masked:
+ 785              	.LFB11:
+ 317:byte_mask_aes.c **** void calcSbox_masked(){
+ 786              		.loc 1 317 23 is_stmt 1 view -0
+ 787              		.cfi_startproc
+ 788              		@ args = 0, pretend = 0, frame = 0
+ 789              		@ frame_needed = 0, uses_anonymous_args = 0
+ 318:byte_mask_aes.c **** 
+ 319:byte_mask_aes.c **** 	//precalculate the needed Sbox to change from Mask m to Maks m'
+ 320:byte_mask_aes.c **** 	int cnt;
+ 790              		.loc 1 320 2 view .LVU240
+ 321:byte_mask_aes.c ****     for(cnt=0;cnt<256;cnt++){
+ 791              		.loc 1 321 5 view .LVU241
+ 792              	.LVL50:
+ 793              		.loc 1 321 18 view .LVU242
+ 317:byte_mask_aes.c **** void calcSbox_masked(){
+ 794              		.loc 1 317 23 is_stmt 0 view .LVU243
+ 795 0000 F0B5     		push	{r4, r5, r6, r7, lr}
+ 796              	.LCFI5:
+ 797              		.cfi_def_cfa_offset 20
+ 798              		.cfi_offset 4, -20
+ 799              		.cfi_offset 5, -16
+ 800              		.cfi_offset 6, -12
+ 801              		.cfi_offset 7, -8
+ 802              		.cfi_offset 14, -4
+ 322:byte_mask_aes.c **** 		Sbox_masked[cnt^Mask[4]] = sbox[cnt]^Mask[5];
+ 803              		.loc 1 322 44 view .LVU244
+ 804 0002 084B     		ldr	r3, .L35
+ 321:byte_mask_aes.c ****     for(cnt=0;cnt<256;cnt++){
+ 805              		.loc 1 321 18 view .LVU245
+ 806 0004 8021     		movs	r1, #128
+ 807              		.loc 1 322 44 view .LVU246
+ 808 0006 5D79     		ldrb	r5, [r3, #5]
+ 809              		.loc 1 322 23 view .LVU247
+ 810 0008 1F79     		ldrb	r7, [r3, #4]
+ 321:byte_mask_aes.c ****     for(cnt=0;cnt<256;cnt++){
+ 811              		.loc 1 321 12 view .LVU248
+ 812 000a 0023     		movs	r3, #0
+ 813              		.loc 1 322 28 view .LVU249
+ 814 000c 064C     		ldr	r4, .L35+4
+ 815              		.loc 1 322 34 view .LVU250
+ 816 000e 074E     		ldr	r6, .L35+8
+ 321:byte_mask_aes.c ****     for(cnt=0;cnt<256;cnt++){
+ 817              		.loc 1 321 18 view .LVU251
+ 818 0010 4900     		lsls	r1, r1, #1
+ 819              	.LVL51:
+ 820              	.L33:
+ 821              		.loc 1 322 3 is_stmt 1 discriminator 3 view .LVU252
+ 822              		.loc 1 322 18 is_stmt 0 discriminator 3 view .LVU253
+ 823 0012 3800     		movs	r0, r7
+ 824              		.loc 1 322 28 discriminator 3 view .LVU254
+ 825 0014 F25C     		ldrb	r2, [r6, r3]
+ 826              		.loc 1 322 18 discriminator 3 view .LVU255
+ 827 0016 5840     		eors	r0, r3
+ 828              		.loc 1 322 28 discriminator 3 view .LVU256
+ 829 0018 6A40     		eors	r2, r5
+ 321:byte_mask_aes.c ****     for(cnt=0;cnt<256;cnt++){
+ 830              		.loc 1 321 26 discriminator 3 view .LVU257
+ 831 001a 0133     		adds	r3, r3, #1
+ 832              	.LVL52:
+ 833              		.loc 1 322 28 discriminator 3 view .LVU258
+ 834 001c 2254     		strb	r2, [r4, r0]
+ 321:byte_mask_aes.c ****     for(cnt=0;cnt<256;cnt++){
+ 835              		.loc 1 321 26 is_stmt 1 discriminator 3 view .LVU259
+ 836              	.LVL53:
+ 321:byte_mask_aes.c ****     for(cnt=0;cnt<256;cnt++){
+ 837              		.loc 1 321 18 discriminator 3 view .LVU260
+ 838 001e 8B42     		cmp	r3, r1
+ 839 0020 F7D1     		bne	.L33
+ 323:byte_mask_aes.c **** 	}
+ 324:byte_mask_aes.c **** }
+ 840              		.loc 1 324 1 is_stmt 0 view .LVU261
+ 841              		@ sp needed
+ 842 0022 F0BD     		pop	{r4, r5, r6, r7, pc}
+ 843              	.L36:
+ 844              		.align	2
+ 845              	.L35:
+ 846 0024 00000000 		.word	.LANCHOR0
+ 847 0028 00000000 		.word	Sbox_masked
+ 848 002c 00000000 		.word	sbox
+ 849              		.cfi_endproc
+ 850              	.LFE11:
+ 852              		.section	.text.init_masked_round_keys,"ax",%progbits
+ 853              		.align	1
+ 854              		.global	init_masked_round_keys
+ 855              		.syntax unified
+ 856              		.code	16
+ 857              		.thumb_func
+ 858              		.fpu softvfp
+ 860              	init_masked_round_keys:
+ 861              	.LFB12:
+ 325:byte_mask_aes.c **** void init_masked_round_keys(){
+ 862              		.loc 1 325 30 is_stmt 1 view -0
+ 863              		.cfi_startproc
+ 864              		@ args = 0, pretend = 0, frame = 0
+ 865              		@ frame_needed = 0, uses_anonymous_args = 0
+ 326:byte_mask_aes.c **** 
+ 327:byte_mask_aes.c **** 	//	2nd-9th RK Mask m' to Mask m1-m4
+ 328:byte_mask_aes.c **** 
+ 329:byte_mask_aes.c ****     int i;
+ 866              		.loc 1 329 5 view .LVU263
+ 330:byte_mask_aes.c **** 	for(i = 0; i<10;i++){
+ 867              		.loc 1 330 2 view .LVU264
+ 868              	.LVL54:
+ 869              		.loc 1 330 14 view .LVU265
+ 325:byte_mask_aes.c **** void init_masked_round_keys(){
+ 870              		.loc 1 325 30 is_stmt 0 view .LVU266
+ 871 0000 F0B5     		push	{r4, r5, r6, r7, lr}
+ 872              	.LCFI6:
+ 873              		.cfi_def_cfa_offset 20
+ 874              		.cfi_offset 4, -20
+ 875              		.cfi_offset 5, -16
+ 876              		.cfi_offset 6, -12
+ 877              		.cfi_offset 7, -8
+ 878              		.cfi_offset 14, -4
+ 879              		.loc 1 330 8 view .LVU267
+ 880 0002 0026     		movs	r6, #0
+ 325:byte_mask_aes.c **** void init_masked_round_keys(){
+ 881              		.loc 1 325 30 view .LVU268
+ 882 0004 87B0     		sub	sp, sp, #28
+ 883              	.LCFI7:
+ 884              		.cfi_def_cfa_offset 48
+ 885              	.LVL55:
+ 886              	.L38:
+ 331:byte_mask_aes.c **** 		remask(RoundKey_masked[i],Mask[6],Mask[7],Mask[8],Mask[9],Mask[4]^WordMask[0],Mask[4]^WordMask[1]
+ 887              		.loc 1 331 3 is_stmt 1 discriminator 3 view .LVU269
+ 888              		.loc 1 331 65 is_stmt 0 discriminator 3 view .LVU270
+ 889 0006 184C     		ldr	r4, .L40
+ 890              		.loc 1 331 3 discriminator 3 view .LVU271
+ 891 0008 184F     		ldr	r7, .L40+4
+ 892 000a 3001     		lsls	r0, r6, #4
+ 893              		.loc 1 331 65 discriminator 3 view .LVU272
+ 894 000c 2579     		ldrb	r5, [r4, #4]
+ 895              		.loc 1 331 3 discriminator 3 view .LVU273
+ 896 000e C019     		adds	r0, r0, r7
+ 897 0010 E77B     		ldrb	r7, [r4, #15]
+ 898 0012 237A     		ldrb	r3, [r4, #8]
+ 899 0014 6F40     		eors	r7, r5
+ 900 0016 E279     		ldrb	r2, [r4, #7]
+ 901 0018 A179     		ldrb	r1, [r4, #6]
+ 902 001a 0497     		str	r7, [sp, #16]
+ 903 001c A77B     		ldrb	r7, [r4, #14]
+ 330:byte_mask_aes.c **** 	for(i = 0; i<10;i++){
+ 904              		.loc 1 330 19 discriminator 3 view .LVU274
+ 905 001e 0136     		adds	r6, r6, #1
+ 906              	.LVL56:
+ 907              		.loc 1 331 3 discriminator 3 view .LVU275
+ 908 0020 6F40     		eors	r7, r5
+ 909 0022 0397     		str	r7, [sp, #12]
+ 910 0024 677B     		ldrb	r7, [r4, #13]
+ 911 0026 6F40     		eors	r7, r5
+ 912 0028 0297     		str	r7, [sp, #8]
+ 913 002a 277B     		ldrb	r7, [r4, #12]
+ 914 002c 7D40     		eors	r5, r7
+ 915 002e 0195     		str	r5, [sp, #4]
+ 916 0030 657A     		ldrb	r5, [r4, #9]
+ 917 0032 0095     		str	r5, [sp]
+ 918 0034 FFF7FEFF 		bl	remask
+ 919              	.LVL57:
+ 330:byte_mask_aes.c **** 	for(i = 0; i<10;i++){
+ 920              		.loc 1 330 19 is_stmt 1 discriminator 3 view .LVU276
+ 330:byte_mask_aes.c **** 	for(i = 0; i<10;i++){
+ 921              		.loc 1 330 14 discriminator 3 view .LVU277
+ 922 0038 0A2E     		cmp	r6, #10
+ 923 003a E4D1     		bne	.L38
+ 332:byte_mask_aes.c **** 	}
+ 333:byte_mask_aes.c **** 
+ 334:byte_mask_aes.c **** 	//1st RK Mask m' to 0
+ 335:byte_mask_aes.c **** 	remask(RoundKey_masked[10],0,0,0,0,Mask[5]^WordMask[0],Mask[5]^WordMask[1],Mask[5]^WordMask[2],Mas
+ 924              		.loc 1 335 2 view .LVU278
+ 925 003c 0021     		movs	r1, #0
+ 926              		.loc 1 335 41 is_stmt 0 view .LVU279
+ 927 003e 6379     		ldrb	r3, [r4, #5]
+ 928              		.loc 1 335 2 view .LVU280
+ 929 0040 E27B     		ldrb	r2, [r4, #15]
+ 930 0042 0B48     		ldr	r0, .L40+8
+ 931 0044 5A40     		eors	r2, r3
+ 932 0046 0492     		str	r2, [sp, #16]
+ 933 0048 A27B     		ldrb	r2, [r4, #14]
+ 934 004a 5A40     		eors	r2, r3
+ 935 004c 0392     		str	r2, [sp, #12]
+ 936 004e 627B     		ldrb	r2, [r4, #13]
+ 937 0050 5A40     		eors	r2, r3
+ 938 0052 0292     		str	r2, [sp, #8]
+ 939 0054 227B     		ldrb	r2, [r4, #12]
+ 940 0056 0091     		str	r1, [sp]
+ 941 0058 5340     		eors	r3, r2
+ 942 005a 0193     		str	r3, [sp, #4]
+ 943 005c 0A00     		movs	r2, r1
+ 944 005e 0B00     		movs	r3, r1
+ 945 0060 FFF7FEFF 		bl	remask
+ 946              	.LVL58:
+ 336:byte_mask_aes.c **** }
+ 947              		.loc 1 336 1 view .LVU281
+ 948 0064 07B0     		add	sp, sp, #28
+ 949              		@ sp needed
+ 950              	.LVL59:
+ 951              		.loc 1 336 1 view .LVU282
+ 952 0066 F0BD     		pop	{r4, r5, r6, r7, pc}
+ 953              	.L41:
+ 954              		.align	2
+ 955              	.L40:
+ 956 0068 00000000 		.word	.LANCHOR0
+ 957 006c 00000000 		.word	RoundKey_masked
+ 958 0070 A0000000 		.word	RoundKey_masked+160
+ 959              		.cfi_endproc
+ 960              	.LFE12:
+ 962              		.section	.text.copy_key,"ax",%progbits
+ 963              		.align	1
+ 964              		.global	copy_key
+ 965              		.syntax unified
+ 966              		.code	16
+ 967              		.thumb_func
+ 968              		.fpu softvfp
+ 970              	copy_key:
+ 971              	.LFB13:
+ 337:byte_mask_aes.c **** void copy_key(){
+ 972              		.loc 1 337 16 is_stmt 1 view -0
+ 973              		.cfi_startproc
+ 974              		@ args = 0, pretend = 0, frame = 0
+ 975              		@ frame_needed = 0, uses_anonymous_args = 0
+ 338:byte_mask_aes.c **** 	//copy the right roundkeys to masked key array
+ 339:byte_mask_aes.c **** 
+ 340:byte_mask_aes.c **** 	uint8_t i,j;
+ 976              		.loc 1 340 2 view .LVU284
+ 341:byte_mask_aes.c **** 	for(i=0;i<11;i++){
+ 977              		.loc 1 341 2 view .LVU285
+ 978              	.LVL60:
+ 979              		.loc 1 341 11 view .LVU286
+ 337:byte_mask_aes.c **** void copy_key(){
+ 980              		.loc 1 337 16 is_stmt 0 view .LVU287
+ 981 0000 10B5     		push	{r4, lr}
+ 982              	.LCFI8:
+ 983              		.cfi_def_cfa_offset 8
+ 984              		.cfi_offset 4, -8
+ 985              		.cfi_offset 14, -4
+ 342:byte_mask_aes.c **** 		for(j=0;j<16;j++){
+ 343:byte_mask_aes.c **** 			RoundKey_masked[i][j] = roundKey[i*16+j];
+ 986              		.loc 1 343 26 view .LVU288
+ 987 0002 B022     		movs	r2, #176
+ 344:byte_mask_aes.c **** 		}
+ 345:byte_mask_aes.c **** 	}
+ 346:byte_mask_aes.c **** }
+ 988              		.loc 1 346 1 view .LVU289
+ 989              		@ sp needed
+ 343:byte_mask_aes.c **** 		}
+ 990              		.loc 1 343 26 view .LVU290
+ 991 0004 0248     		ldr	r0, .L43
+ 992 0006 0349     		ldr	r1, .L43+4
+ 993 0008 FFF7FEFF 		bl	memcpy
+ 994              	.LVL61:
+ 995              		.loc 1 346 1 view .LVU291
+ 996 000c 10BD     		pop	{r4, pc}
+ 997              	.L44:
+ 998 000e C046     		.align	2
+ 999              	.L43:
+ 1000 0010 00000000 		.word	RoundKey_masked
+ 1001 0014 00000000 		.word	roundKey
+ 1002              		.cfi_endproc
+ 1003              	.LFE13:
+ 1005              		.section	.text.init_masking,"ax",%progbits
+ 1006              		.align	1
+ 1007              		.global	init_masking
+ 1008              		.syntax unified
+ 1009              		.code	16
+ 1010              		.thumb_func
+ 1011              		.fpu softvfp
+ 1013              	init_masking:
+ 1014              	.LFB14:
+ 347:byte_mask_aes.c **** void init_masking(){
+ 1015              		.loc 1 347 20 is_stmt 1 view -0
+ 1016              		.cfi_startproc
+ 1017              		@ args = 0, pretend = 0, frame = 0
+ 1018              		@ frame_needed = 0, uses_anonymous_args = 0
+ 348:byte_mask_aes.c **** 	copy_key();
+ 1019              		.loc 1 348 2 view .LVU293
+ 347:byte_mask_aes.c **** void init_masking(){
+ 1020              		.loc 1 347 20 is_stmt 0 view .LVU294
+ 1021 0000 10B5     		push	{r4, lr}
+ 1022              	.LCFI9:
+ 1023              		.cfi_def_cfa_offset 8
+ 1024              		.cfi_offset 4, -8
+ 1025              		.cfi_offset 14, -4
+ 1026              		.loc 1 348 2 view .LVU295
+ 1027 0002 FFF7FEFF 		bl	copy_key
+ 1028              	.LVL62:
+ 349:byte_mask_aes.c **** 
+ 350:byte_mask_aes.c **** 	//Calculates: m1',m2',m3',m4'
+ 351:byte_mask_aes.c **** 	calcMixColMask();
+ 1029              		.loc 1 351 2 is_stmt 1 view .LVU296
+ 352:byte_mask_aes.c **** 	calcSbox_masked();
+ 353:byte_mask_aes.c **** 	init_masked_round_keys();
+ 354:byte_mask_aes.c **** 
+ 355:byte_mask_aes.c **** }
+ 1030              		.loc 1 355 1 is_stmt 0 view .LVU297
+ 1031              		@ sp needed
+ 351:byte_mask_aes.c **** 	calcSbox_masked();
+ 1032              		.loc 1 351 2 view .LVU298
+ 1033 0006 FFF7FEFF 		bl	calcMixColMask
+ 1034              	.LVL63:
+ 352:byte_mask_aes.c **** 	calcSbox_masked();
+ 1035              		.loc 1 352 2 is_stmt 1 view .LVU299
+ 1036 000a FFF7FEFF 		bl	calcSbox_masked
+ 1037              	.LVL64:
+ 353:byte_mask_aes.c **** 
+ 1038              		.loc 1 353 2 view .LVU300
+ 1039 000e FFF7FEFF 		bl	init_masked_round_keys
+ 1040              	.LVL65:
+ 1041              		.loc 1 355 1 is_stmt 0 view .LVU301
+ 1042 0012 10BD     		pop	{r4, pc}
+ 1043              		.cfi_endproc
+ 1044              	.LFE14:
+ 1046              		.section	.text.randomize_mask,"ax",%progbits
+ 1047              		.align	1
+ 1048              		.global	randomize_mask
+ 1049              		.syntax unified
+ 1050              		.code	16
+ 1051              		.thumb_func
+ 1052              		.fpu softvfp
+ 1054              	randomize_mask:
+ 1055              	.LFB15:
+ 356:byte_mask_aes.c **** void randomize_mask()
+ 357:byte_mask_aes.c **** {
+ 1056              		.loc 1 357 1 is_stmt 1 view -0
+ 1057              		.cfi_startproc
+ 1058              		@ args = 0, pretend = 0, frame = 0
+ 1059              		@ frame_needed = 0, uses_anonymous_args = 0
+ 358:byte_mask_aes.c ****     randbyte(&Mask[0]);
+ 1060              		.loc 1 358 5 view .LVU303
+ 357:byte_mask_aes.c ****     randbyte(&Mask[0]);
+ 1061              		.loc 1 357 1 is_stmt 0 view .LVU304
+ 1062 0000 10B5     		push	{r4, lr}
+ 1063              	.LCFI10:
+ 1064              		.cfi_def_cfa_offset 8
+ 1065              		.cfi_offset 4, -8
+ 1066              		.cfi_offset 14, -4
+ 1067              		.loc 1 358 5 view .LVU305
+ 1068 0002 124C     		ldr	r4, .L47
+ 359:byte_mask_aes.c ****     randbyte(&Mask[1]);
+ 360:byte_mask_aes.c ****     randbyte(&Mask[2]);
+ 361:byte_mask_aes.c ****     randbyte(&Mask[3]);
+ 362:byte_mask_aes.c ****     randbyte(&Mask[4]);
+ 363:byte_mask_aes.c ****     randbyte(&Mask[5]);
+ 364:byte_mask_aes.c ****     randbyte(&WordMask[0]);
+ 365:byte_mask_aes.c ****     randbyte(&WordMask[1]);
+ 366:byte_mask_aes.c ****     randbyte(&WordMask[2]);
+ 367:byte_mask_aes.c ****     randbyte(&WordMask[3]);
+ 368:byte_mask_aes.c **** }
+ 1069              		.loc 1 368 1 view .LVU306
+ 1070              		@ sp needed
+ 358:byte_mask_aes.c ****     randbyte(&Mask[1]);
+ 1071              		.loc 1 358 5 view .LVU307
+ 1072 0004 2000     		movs	r0, r4
+ 1073 0006 FFF7FEFF 		bl	randbyte
+ 1074              	.LVL66:
+ 359:byte_mask_aes.c ****     randbyte(&Mask[1]);
+ 1075              		.loc 1 359 5 is_stmt 1 view .LVU308
+ 1076 000a 601C     		adds	r0, r4, #1
+ 1077 000c FFF7FEFF 		bl	randbyte
+ 1078              	.LVL67:
+ 360:byte_mask_aes.c ****     randbyte(&Mask[3]);
+ 1079              		.loc 1 360 5 view .LVU309
+ 1080 0010 A01C     		adds	r0, r4, #2
+ 1081 0012 FFF7FEFF 		bl	randbyte
+ 1082              	.LVL68:
+ 361:byte_mask_aes.c ****     randbyte(&Mask[4]);
+ 1083              		.loc 1 361 5 view .LVU310
+ 1084 0016 E01C     		adds	r0, r4, #3
+ 1085 0018 FFF7FEFF 		bl	randbyte
+ 1086              	.LVL69:
+ 362:byte_mask_aes.c ****     randbyte(&Mask[5]);
+ 1087              		.loc 1 362 5 view .LVU311
+ 1088 001c 201D     		adds	r0, r4, #4
+ 1089 001e FFF7FEFF 		bl	randbyte
+ 1090              	.LVL70:
+ 363:byte_mask_aes.c ****     randbyte(&WordMask[0]);
+ 1091              		.loc 1 363 5 view .LVU312
+ 1092 0022 601D     		adds	r0, r4, #5
+ 1093 0024 FFF7FEFF 		bl	randbyte
+ 1094              	.LVL71:
+ 364:byte_mask_aes.c ****     randbyte(&WordMask[1]);
+ 1095              		.loc 1 364 5 view .LVU313
+ 1096 0028 2000     		movs	r0, r4
+ 1097 002a 0C30     		adds	r0, r0, #12
+ 1098 002c FFF7FEFF 		bl	randbyte
+ 1099              	.LVL72:
+ 365:byte_mask_aes.c ****     randbyte(&WordMask[2]);
+ 1100              		.loc 1 365 5 view .LVU314
+ 1101 0030 2000     		movs	r0, r4
+ 1102 0032 0D30     		adds	r0, r0, #13
+ 1103 0034 FFF7FEFF 		bl	randbyte
+ 1104              	.LVL73:
+ 366:byte_mask_aes.c ****     randbyte(&WordMask[3]);
+ 1105              		.loc 1 366 5 view .LVU315
+ 1106 0038 2000     		movs	r0, r4
+ 1107 003a 0E30     		adds	r0, r0, #14
+ 1108 003c FFF7FEFF 		bl	randbyte
+ 1109              	.LVL74:
+ 367:byte_mask_aes.c **** }
+ 1110              		.loc 1 367 5 view .LVU316
+ 1111 0040 2000     		movs	r0, r4
+ 1112 0042 0F30     		adds	r0, r0, #15
+ 1113 0044 FFF7FEFF 		bl	randbyte
+ 1114              	.LVL75:
+ 1115              		.loc 1 368 1 is_stmt 0 view .LVU317
+ 1116 0048 10BD     		pop	{r4, pc}
+ 1117              	.L48:
+ 1118 004a C046     		.align	2
+ 1119              	.L47:
+ 1120 004c 00000000 		.word	.LANCHOR0
+ 1121              		.cfi_endproc
+ 1122              	.LFE15:
+ 1124              		.section	.text.subBytes_masked,"ax",%progbits
+ 1125              		.align	1
+ 1126              		.global	subBytes_masked
+ 1127              		.syntax unified
+ 1128              		.code	16
+ 1129              		.thumb_func
+ 1130              		.fpu softvfp
+ 1132              	subBytes_masked:
+ 1133              	.LVL76:
+ 1134              	.LFB16:
+ 369:byte_mask_aes.c **** 
+ 370:byte_mask_aes.c **** 
+ 371:byte_mask_aes.c **** void subBytes_masked(uint8_t state[16]){
+ 1135              		.loc 1 371 40 is_stmt 1 view -0
+ 1136              		.cfi_startproc
+ 1137              		@ args = 0, pretend = 0, frame = 0
+ 1138              		@ frame_needed = 0, uses_anonymous_args = 0
+ 372:byte_mask_aes.c **** 
+ 373:byte_mask_aes.c ****     uint8_t i;
+ 1139              		.loc 1 373 5 view .LVU319
+ 374:byte_mask_aes.c ****     for (i = 0; i < 16; i++) {
+ 1140              		.loc 1 374 5 view .LVU320
+ 1141              		.loc 1 374 19 view .LVU321
+ 371:byte_mask_aes.c **** 
+ 1142              		.loc 1 371 40 is_stmt 0 view .LVU322
+ 1143 0000 70B5     		push	{r4, r5, r6, lr}
+ 1144              	.LCFI11:
+ 1145              		.cfi_def_cfa_offset 16
+ 1146              		.cfi_offset 4, -16
+ 1147              		.cfi_offset 5, -12
+ 1148              		.cfi_offset 6, -8
+ 1149              		.cfi_offset 14, -4
+ 371:byte_mask_aes.c **** 
+ 1150              		.loc 1 371 40 view .LVU323
+ 1151 0002 0023     		movs	r3, #0
+ 375:byte_mask_aes.c ****         state[i] = Sbox_masked[state[i] ^ WordMask[i % 4]] ^ WordMask[i % 4];
+ 1152              		.loc 1 375 54 view .LVU324
+ 1153 0004 0326     		movs	r6, #3
+ 1154              		.loc 1 375 51 view .LVU325
+ 1155 0006 074D     		ldr	r5, .L52
+ 1156              		.loc 1 375 31 view .LVU326
+ 1157 0008 074C     		ldr	r4, .L52+4
+ 1158              	.LVL77:
+ 1159              	.L50:
+ 1160              		.loc 1 375 9 is_stmt 1 discriminator 3 view .LVU327
+ 1161              		.loc 1 375 54 is_stmt 0 discriminator 3 view .LVU328
+ 1162 000a 1A00     		movs	r2, r3
+ 1163 000c 3240     		ands	r2, r6
+ 1164              		.loc 1 375 51 discriminator 3 view .LVU329
+ 1165 000e AA18     		adds	r2, r5, r2
+ 1166 0010 127B     		ldrb	r2, [r2, #12]
+ 1167              		.loc 1 375 41 discriminator 3 view .LVU330
+ 1168 0012 C15C     		ldrb	r1, [r0, r3]
+ 1169 0014 5140     		eors	r1, r2
+ 1170              		.loc 1 375 18 discriminator 3 view .LVU331
+ 1171 0016 615C     		ldrb	r1, [r4, r1]
+ 1172 0018 4A40     		eors	r2, r1
+ 1173 001a C254     		strb	r2, [r0, r3]
+ 374:byte_mask_aes.c ****     for (i = 0; i < 16; i++) {
+ 1174              		.loc 1 374 26 is_stmt 1 discriminator 3 view .LVU332
+ 1175              	.LVL78:
+ 374:byte_mask_aes.c ****     for (i = 0; i < 16; i++) {
+ 1176              		.loc 1 374 19 discriminator 3 view .LVU333
+ 1177 001c 0133     		adds	r3, r3, #1
+ 1178              	.LVL79:
+ 374:byte_mask_aes.c ****     for (i = 0; i < 16; i++) {
+ 1179              		.loc 1 374 19 is_stmt 0 discriminator 3 view .LVU334
+ 1180 001e 102B     		cmp	r3, #16
+ 1181 0020 F3D1     		bne	.L50
+ 376:byte_mask_aes.c ****     }
+ 377:byte_mask_aes.c ****     
+ 378:byte_mask_aes.c **** }
+ 1182              		.loc 1 378 1 view .LVU335
+ 1183              		@ sp needed
+ 1184 0022 70BD     		pop	{r4, r5, r6, pc}
+ 1185              	.L53:
+ 1186              		.align	2
+ 1187              	.L52:
+ 1188 0024 00000000 		.word	.LANCHOR0
+ 1189 0028 00000000 		.word	Sbox_masked
+ 1190              		.cfi_endproc
+ 1191              	.LFE16:
+ 1193              		.section	.text.maskstate,"ax",%progbits
+ 1194              		.align	1
+ 1195              		.global	maskstate
+ 1196              		.syntax unified
+ 1197              		.code	16
+ 1198              		.thumb_func
+ 1199              		.fpu softvfp
+ 1201              	maskstate:
+ 1202              	.LVL80:
+ 1203              	.LFB17:
+ 379:byte_mask_aes.c **** 
+ 380:byte_mask_aes.c **** void maskstate(uint8_t* state)
+ 381:byte_mask_aes.c **** {
+ 1204              		.loc 1 381 1 is_stmt 1 view -0
+ 1205              		.cfi_startproc
+ 1206              		@ args = 0, pretend = 0, frame = 0
+ 1207              		@ frame_needed = 0, uses_anonymous_args = 0
+ 382:byte_mask_aes.c ****     remask(state,Mask[6],Mask[7],Mask[8],Mask[9],0,0,0,0);
+ 1208              		.loc 1 382 5 view .LVU337
+ 381:byte_mask_aes.c ****     remask(state,Mask[6],Mask[7],Mask[8],Mask[9],0,0,0,0);
+ 1209              		.loc 1 381 1 is_stmt 0 view .LVU338
+ 1210 0000 30B5     		push	{r4, r5, lr}
+ 1211              	.LCFI12:
+ 1212              		.cfi_def_cfa_offset 12
+ 1213              		.cfi_offset 4, -12
+ 1214              		.cfi_offset 5, -8
+ 1215              		.cfi_offset 14, -4
+ 1216              		.loc 1 382 5 view .LVU339
+ 1217 0002 0025     		movs	r5, #0
+ 1218 0004 074C     		ldr	r4, .L55
+ 381:byte_mask_aes.c ****     remask(state,Mask[6],Mask[7],Mask[8],Mask[9],0,0,0,0);
+ 1219              		.loc 1 381 1 view .LVU340
+ 1220 0006 87B0     		sub	sp, sp, #28
+ 1221              	.LCFI13:
+ 1222              		.cfi_def_cfa_offset 40
+ 1223              		.loc 1 382 5 view .LVU341
+ 1224 0008 237A     		ldrb	r3, [r4, #8]
+ 1225 000a E279     		ldrb	r2, [r4, #7]
+ 1226 000c A179     		ldrb	r1, [r4, #6]
+ 1227 000e 0495     		str	r5, [sp, #16]
+ 1228 0010 0395     		str	r5, [sp, #12]
+ 1229 0012 0295     		str	r5, [sp, #8]
+ 1230 0014 0195     		str	r5, [sp, #4]
+ 1231 0016 647A     		ldrb	r4, [r4, #9]
+ 1232 0018 0094     		str	r4, [sp]
+ 1233 001a FFF7FEFF 		bl	remask
+ 1234              	.LVL81:
+ 383:byte_mask_aes.c **** }
+ 1235              		.loc 1 383 1 view .LVU342
+ 1236 001e 07B0     		add	sp, sp, #28
+ 1237              		@ sp needed
+ 1238 0020 30BD     		pop	{r4, r5, pc}
+ 1239              	.L56:
+ 1240 0022 C046     		.align	2
+ 1241              	.L55:
+ 1242 0024 00000000 		.word	.LANCHOR0
+ 1243              		.cfi_endproc
+ 1244              	.LFE17:
+ 1246              		.section	.text.aes128,"ax",%progbits
+ 1247              		.align	1
+ 1248              		.global	aes128
+ 1249              		.syntax unified
+ 1250              		.code	16
+ 1251              		.thumb_func
+ 1252              		.fpu softvfp
+ 1254              	aes128:
+ 1255              	.LVL82:
+ 1256              	.LFB18:
+ 384:byte_mask_aes.c **** void aes128(uint8_t* state)
+ 385:byte_mask_aes.c **** {
+ 1257              		.loc 1 385 1 is_stmt 1 view -0
+ 1258              		.cfi_startproc
+ 1259              		@ args = 0, pretend = 0, frame = 0
+ 1260              		@ frame_needed = 0, uses_anonymous_args = 0
+ 386:byte_mask_aes.c ****     asm volatile ("cpsid i" : : : "memory");
+ 1261              		.loc 1 386 5 view .LVU344
+ 385:byte_mask_aes.c ****     asm volatile ("cpsid i" : : : "memory");
+ 1262              		.loc 1 385 1 is_stmt 0 view .LVU345
+ 1263 0000 70B5     		push	{r4, r5, r6, lr}
+ 1264              	.LCFI14:
+ 1265              		.cfi_def_cfa_offset 16
+ 1266              		.cfi_offset 4, -16
+ 1267              		.cfi_offset 5, -12
+ 1268              		.cfi_offset 6, -8
+ 1269              		.cfi_offset 14, -4
+ 1270 0002 0500     		movs	r5, r0
+ 1271 0004 86B0     		sub	sp, sp, #24
+ 1272              	.LCFI15:
+ 1273              		.cfi_def_cfa_offset 40
+ 1274              		.loc 1 386 5 view .LVU346
+ 1275              		.syntax divided
+ 1276              	@ 386 "byte_mask_aes.c" 1
+ 1277 0006 72B6     		cpsid i
+ 1278              	@ 0 "" 2
+ 387:byte_mask_aes.c **** 
+ 388:byte_mask_aes.c ****     trigger_high();
+ 1279              		.loc 1 388 5 is_stmt 1 view .LVU347
+ 1280              		.thumb
+ 1281              		.syntax unified
+ 1282 0008 FFF7FEFF 		bl	trigger_high
+ 1283              	.LVL83:
+ 389:byte_mask_aes.c **** 
+ 390:byte_mask_aes.c ****     addRoundKey_masked(state, 0);
+ 1284              		.loc 1 390 5 view .LVU348
+ 1285 000c 0021     		movs	r1, #0
+ 1286 000e 2800     		movs	r0, r5
+ 1287 0010 FFF7FEFF 		bl	addRoundKey_masked
+ 1288              	.LVL84:
+ 391:byte_mask_aes.c ****     
+ 392:byte_mask_aes.c ****     uint8_t i=1,j=0;
+ 1289              		.loc 1 392 5 view .LVU349
+ 393:byte_mask_aes.c **** #ifdef TEST_AES
+ 394:byte_mask_aes.c ****     for (i = 1; i <10; i++) {
+ 395:byte_mask_aes.c **** #endif
+ 396:byte_mask_aes.c **** 
+ 397:byte_mask_aes.c ****         subBytes_masked(state);
+ 1290              		.loc 1 397 9 view .LVU350
+ 1291 0014 2800     		movs	r0, r5
+ 1292 0016 FFF7FEFF 		bl	subBytes_masked
+ 1293              	.LVL85:
+ 398:byte_mask_aes.c **** 
+ 399:byte_mask_aes.c ****         shiftRows(state);
+ 1294              		.loc 1 399 9 view .LVU351
+ 1295 001a 2800     		movs	r0, r5
+ 1296 001c FFF7FEFF 		bl	shiftRows
+ 1297              	.LVL86:
+ 400:byte_mask_aes.c ****         
+ 401:byte_mask_aes.c ****         remask(state,Mask[0],Mask[1],Mask[2],Mask[3],Mask[5]^WordMask[0],Mask[5]^WordMask[1],Mask[5
+ 1298              		.loc 1 401 9 view .LVU352
+ 1299              		.loc 1 401 58 is_stmt 0 view .LVU353
+ 1300 0020 104C     		ldr	r4, .L58
+ 1301 0022 6079     		ldrb	r0, [r4, #5]
+ 1302              		.loc 1 401 9 view .LVU354
+ 1303 0024 E67B     		ldrb	r6, [r4, #15]
+ 1304 0026 A378     		ldrb	r3, [r4, #2]
+ 1305 0028 4640     		eors	r6, r0
+ 1306 002a 6278     		ldrb	r2, [r4, #1]
+ 1307 002c 2178     		ldrb	r1, [r4]
+ 1308 002e 0496     		str	r6, [sp, #16]
+ 1309 0030 A67B     		ldrb	r6, [r4, #14]
+ 1310 0032 4640     		eors	r6, r0
+ 1311 0034 0396     		str	r6, [sp, #12]
+ 1312 0036 667B     		ldrb	r6, [r4, #13]
+ 1313 0038 4640     		eors	r6, r0
+ 1314 003a 0296     		str	r6, [sp, #8]
+ 1315 003c 267B     		ldrb	r6, [r4, #12]
+ 1316 003e 7040     		eors	r0, r6
+ 1317 0040 0190     		str	r0, [sp, #4]
+ 1318 0042 E078     		ldrb	r0, [r4, #3]
+ 1319 0044 0090     		str	r0, [sp]
+ 1320 0046 2800     		movs	r0, r5
+ 1321 0048 FFF7FEFF 		bl	remask
+ 1322              	.LVL87:
+ 402:byte_mask_aes.c ****     
+ 403:byte_mask_aes.c ****         mixColumns(state);
+ 1323              		.loc 1 403 9 is_stmt 1 view .LVU355
+ 1324 004c 2800     		movs	r0, r5
+ 1325 004e FFF7FEFF 		bl	mixColumns
+ 1326              	.LVL88:
+ 404:byte_mask_aes.c ****     
+ 405:byte_mask_aes.c ****         addRoundKey_masked(state, i);
+ 1327              		.loc 1 405 9 view .LVU356
+ 1328 0052 0121     		movs	r1, #1
+ 1329 0054 2800     		movs	r0, r5
+ 1330 0056 FFF7FEFF 		bl	addRoundKey_masked
+ 1331              	.LVL89:
+ 406:byte_mask_aes.c **** 
+ 407:byte_mask_aes.c ****     //trigger_high();
+ 408:byte_mask_aes.c **** 
+ 409:byte_mask_aes.c ****     //trigger_low();
+ 410:byte_mask_aes.c ****     // use following to remove masks from state at this point (not part of AES)
+ 411:byte_mask_aes.c ****     // remask(state,0,0,0,0,Mask[4]^WordMask[0],Mask[4]^WordMask[1],Mask[4]^WordMask[2],Mask[4]^Wor
+ 412:byte_mask_aes.c **** #ifdef TEST_AES
+ 413:byte_mask_aes.c ****     }
+ 414:byte_mask_aes.c ****     subBytes_masked(state);
+ 415:byte_mask_aes.c ****     shiftRows(state);
+ 416:byte_mask_aes.c ****     addRoundKey_masked(state, 10);
+ 417:byte_mask_aes.c **** #endif
+ 418:byte_mask_aes.c ****     trigger_low();
+ 1332              		.loc 1 418 5 view .LVU357
+ 1333 005a FFF7FEFF 		bl	trigger_low
+ 1334              	.LVL90:
+ 419:byte_mask_aes.c ****     asm volatile ("cpsie i" : : : "memory");
+ 1335              		.loc 1 419 5 view .LVU358
+ 1336              		.syntax divided
+ 1337              	@ 419 "byte_mask_aes.c" 1
+ 1338 005e 62B6     		cpsie i
+ 1339              	@ 0 "" 2
+ 420:byte_mask_aes.c **** }
+ 1340              		.loc 1 420 1 is_stmt 0 view .LVU359
+ 1341              		.thumb
+ 1342              		.syntax unified
+ 1343 0060 06B0     		add	sp, sp, #24
+ 1344              		@ sp needed
+ 1345              	.LVL91:
+ 1346              		.loc 1 420 1 view .LVU360
+ 1347 0062 70BD     		pop	{r4, r5, r6, pc}
+ 1348              	.L59:
+ 1349              		.align	2
+ 1350              	.L58:
+ 1351 0064 00000000 		.word	.LANCHOR0
+ 1352              		.cfi_endproc
+ 1353              	.LFE18:
+ 1355              		.global	roundKey
+ 1356              		.global	RoundKey_masked
+ 1357              		.global	WordMask
+ 1358              		.global	Mask
+ 1359              		.global	Sbox_masked
+ 1360              		.global	mul_03
+ 1361              		.global	mul_02
+ 1362              		.global	sbox
+ 1363              		.section	.rodata
+ 1366              	mul_03:
+ 1367 0000 00030605 		.ascii	"\000\003\006\005\014\017\012\011\030\033\036\035\024"
+ 1367      0C0F0A09 
+ 1367      181B1E1D 
+ 1367      14
+ 1368 000d 17121130 		.ascii	"\027\022\0210365<?:9(+.-$'\"!`cfelojix{~}twrqPSVU\\"
+ 1368      3336353C 
+ 1368      3F3A3928 
+ 1368      2B2E2D24 
+ 1368      27222160 
+ 1369 0035 5F5A5948 		.ascii	"_ZYHKNMDGBA\300\303\306\305\314\317\312\311\330\333"
+ 1369      4B4E4D44 
+ 1369      474241C0 
+ 1369      C3C6C5CC 
+ 1369      CFCAC9D8 
+ 1370 004a DEDDD4D7 		.ascii	"\336\335\324\327\322\321\360\363\366\365\374\377\372"
+ 1370      D2D1F0F3 
+ 1370      F6F5FCFF 
+ 1370      FA
+ 1371 0057 F9E8EBEE 		.ascii	"\371\350\353\356\355\344\347\342\341\240\243\246\245"
+ 1371      EDE4E7E2 
+ 1371      E1A0A3A6 
+ 1371      A5
+ 1372 0064 ACAFAAA9 		.ascii	"\254\257\252\251\270\273\276\275\264\267\262\261\220"
+ 1372      B8BBBEBD 
+ 1372      B4B7B2B1 
+ 1372      90
+ 1373 0071 9396959C 		.ascii	"\223\226\225\234\237\232\231\210\213\216\215\204\207"
+ 1373      9F9A9988 
+ 1373      8B8E8D84 
+ 1373      87
+ 1374 007e 82819B98 		.ascii	"\202\201\233\230\235\236\227\224\221\222\203\200\205"
+ 1374      9D9E9794 
+ 1374      91928380 
+ 1374      85
+ 1375 008b 868F8C89 		.ascii	"\206\217\214\211\212\253\250\255\256\247\244\241\242"
+ 1375      8AABA8AD 
+ 1375      AEA7A4A1 
+ 1375      A2
+ 1376 0098 B3B0B5B6 		.ascii	"\263\260\265\266\277\274\271\272\373\370\375\376\367"
+ 1376      BFBCB9BA 
+ 1376      FBF8FDFE 
+ 1376      F7
+ 1377 00a5 F4F1F2E3 		.ascii	"\364\361\362\343\340\345\346\357\354\351\352\313\310"
+ 1377      E0E5E6EF 
+ 1377      ECE9EACB 
+ 1377      C8
+ 1378 00b2 CDCEC7C4 		.ascii	"\315\316\307\304\301\302\323\320\325\326\337\334\331"
+ 1378      C1C2D3D0 
+ 1378      D5D6DFDC 
+ 1378      D9
+ 1379 00bf DA5B585D 		.ascii	"\332[X]^WTQRC@EFOLIJkhmngdabspuv\177|yz;8=>7412# %&"
+ 1379      5E575451 
+ 1379      52434045 
+ 1379      464F4C49 
+ 1379      4A6B686D 
+ 1380 00ec 2F2C292A 		.ascii	"/,)*\013\010\015\016\007\004\001\002\023\020\025\026"
+ 1380      0B080D0E 
+ 1380      07040102 
+ 1380      13101516 
+ 1381 00fc 1F1C191A 		.ascii	"\037\034\031\032"
+ 1384              	mul_02:
+ 1385 0100 00020406 		.ascii	"\000\002\004\006\010\012\014\016\020\022\024\026\030"
+ 1385      080A0C0E 
+ 1385      10121416 
+ 1385      18
+ 1386 010d 1A1C1E20 		.ascii	"\032\034\036 \"$&(*,.02468:<>@BDFHJLNPRTVXZ\\^`bdfh"
+ 1386      22242628 
+ 1386      2A2C2E30 
+ 1386      32343638 
+ 1386      3A3C3E40 
+ 1387 0135 6A6C6E70 		.ascii	"jlnprtvxz|~\200\202\204\206\210\212\214\216\220\222"
+ 1387      72747678 
+ 1387      7A7C7E80 
+ 1387      82848688 
+ 1387      8A8C8E90 
+ 1388 014a 9496989A 		.ascii	"\224\226\230\232\234\236\240\242\244\246\250\252\254"
+ 1388      9C9EA0A2 
+ 1388      A4A6A8AA 
+ 1388      AC
+ 1389 0157 AEB0B2B4 		.ascii	"\256\260\262\264\266\270\272\274\276\300\302\304\306"
+ 1389      B6B8BABC 
+ 1389      BEC0C2C4 
+ 1389      C6
+ 1390 0164 C8CACCCE 		.ascii	"\310\312\314\316\320\322\324\326\330\332\334\336\340"
+ 1390      D0D2D4D6 
+ 1390      D8DADCDE 
+ 1390      E0
+ 1391 0171 E2E4E6E8 		.ascii	"\342\344\346\350\352\354\356\360\362\364\366\370\372"
+ 1391      EAECEEF0 
+ 1391      F2F4F6F8 
+ 1391      FA
+ 1392 017e FCFE1B19 		.ascii	"\374\376\033\031\037\035\023\021\027\025\013\011\017"
+ 1392      1F1D1311 
+ 1392      17150B09 
+ 1392      0F
+ 1393 018b 0D030107 		.ascii	"\015\003\001\007\005;9?=3175+)/-#!'%[Y_]SQWUKIOMCAG"
+ 1393      053B393F 
+ 1393      3D333137 
+ 1393      352B292F 
+ 1393      2D232127 
+ 1394 01af 457B797F 		.ascii	"E{y\177}sqwukiomcage\233\231\237\235\223\221\227\225"
+ 1394      7D737177 
+ 1394      756B696F 
+ 1394      6D636167 
+ 1394      659B999F 
+ 1395 01c8 8B898F8D 		.ascii	"\213\211\217\215\203\201\207\205\273\271\277\275\263"
+ 1395      83818785 
+ 1395      BBB9BFBD 
+ 1395      B3
+ 1396 01d5 B1B7B5AB 		.ascii	"\261\267\265\253\251\257\255\243\241\247\245\333\331"
+ 1396      A9AFADA3 
+ 1396      A1A7A5DB 
+ 1396      D9
+ 1397 01e2 DFDDD3D1 		.ascii	"\337\335\323\321\327\325\313\311\317\315\303\301\307"
+ 1397      D7D5CBC9 
+ 1397      CFCDC3C1 
+ 1397      C7
+ 1398 01ef C5FBF9FF 		.ascii	"\305\373\371\377\375\363\361\367\365\353\351\357\355"
+ 1398      FDF3F1F7 
+ 1398      F5EBE9EF 
+ 1398      ED
+ 1399 01fc E3E1E7E5 		.ascii	"\343\341\347\345"
+ 1402              	Rcon:
+ 1403 0200 8D010204 		.ascii	"\215\001\002\004\010\020 @\200\0336l\330\253M\232/^"
+ 1403      08102040 
+ 1403      801B366C 
+ 1403      D8AB4D9A 
+ 1403      2F5E
+ 1404 0212 BC63C697 		.ascii	"\274c\306\2275j\324\263}\372\357\305\2219r\344\323\275"
+ 1404      356AD4B3 
+ 1404      7DFAEFC5 
+ 1404      913972E4 
+ 1404      D3BD
+ 1405 0224 61C29F25 		.ascii	"a\302\237%J\2243f\314\203\035:t\350\313\215\001\002"
+ 1405      4A943366 
+ 1405      CC831D3A 
+ 1405      74E8CB8D 
+ 1405      0102
+ 1406 0236 04081020 		.ascii	"\004\010\020 @\200\0336l\330\253M\232/^\274c\306\227"
+ 1406      40801B36 
+ 1406      6CD8AB4D 
+ 1406      9A2F5EBC 
+ 1406      63C697
+ 1407 0249 356AD4B3 		.ascii	"5j\324\263}\372\357\305\2219r\344\323\275a\302\237%"
+ 1407      7DFAEFC5 
+ 1407      913972E4 
+ 1407      D3BD61C2 
+ 1407      9F25
+ 1408 025b 4A943366 		.ascii	"J\2243f\314\203\035:t\350\313\215\001\002\004\010\020"
+ 1408      CC831D3A 
+ 1408      74E8CB8D 
+ 1408      01020408 
+ 1408      10
+ 1409 026c 2040801B 		.ascii	" @\200\0336l\330\253M\232/^\274c\306\2275j\324\263}"
+ 1409      366CD8AB 
+ 1409      4D9A2F5E 
+ 1409      BC63C697 
+ 1409      356AD4B3 
+ 1410 0281 FAEFC591 		.ascii	"\372\357\305\2219r\344\323\275a\302\237%J\2243f\314"
+ 1410      3972E4D3 
+ 1410      BD61C29F 
+ 1410      254A9433 
+ 1410      66CC
+ 1411 0293 831D3A74 		.ascii	"\203\035:t\350\313\215\001\002\004\010\020 @\200\033"
+ 1411      E8CB8D01 
+ 1411      02040810 
+ 1411      2040801B 
+ 1412 02a3 366CD8AB 		.ascii	"6l\330\253M\232/^\274c\306\2275j\324\263}\372\357\305"
+ 1412      4D9A2F5E 
+ 1412      BC63C697 
+ 1412      356AD4B3 
+ 1412      7DFAEFC5 
+ 1413 02b7 913972E4 		.ascii	"\2219r\344\323\275a\302\237%J\2243f\314\203\035:t\350"
+ 1413      D3BD61C2 
+ 1413      9F254A94 
+ 1413      3366CC83 
+ 1413      1D3A74E8 
+ 1414 02cb CB8D0102 		.ascii	"\313\215\001\002\004\010\020 @\200\0336l\330\253M\232"
+ 1414      04081020 
+ 1414      40801B36 
+ 1414      6CD8AB4D 
+ 1414      9A
+ 1415 02dc 2F5EBC63 		.ascii	"/^\274c\306\2275j\324\263}\372\357\305\2219r\344\323"
+ 1415      C697356A 
+ 1415      D4B37DFA 
+ 1415      EFC59139 
+ 1415      72E4D3
+ 1416 02ef BD61C29F 		.ascii	"\275a\302\237%J\2243f\314\203\035:t\350\313"
+ 1416      254A9433 
+ 1416      66CC831D 
+ 1416      3A74E8CB 
+ 1419              	sbox:
+ 1420 02ff 637C777B 		.ascii	"c|w{\362ko\3050\001g+\376\327\253v\312\202\311}\372"
+ 1420      F26B6FC5 
+ 1420      3001672B 
+ 1420      FED7AB76 
+ 1420      CA82C97D 
+ 1421 0314 5947F0AD 		.ascii	"YG\360\255\324\242\257\234\244r\300\267\375\223&6?\367"
+ 1421      D4A2AF9C 
+ 1421      A472C0B7 
+ 1421      FD932636 
+ 1421      3FF7
+ 1422 0326 CC34A5E5 		.ascii	"\3144\245\345\361q\3301\025\004\307#\303\030\226\005"
+ 1422      F171D831 
+ 1422      1504C723 
+ 1422      C3189605 
+ 1423 0336 9A071280 		.ascii	"\232\007\022\200\342\353'\262u\011\203,\032\033nZ\240"
+ 1423      E2EB27B2 
+ 1423      7509832C 
+ 1423      1A1B6E5A 
+ 1423      A0
+ 1424 0347 523BD6B3 		.ascii	"R;\326\263)\343/\204S\321\000\355 \374\261[j\313\276"
+ 1424      29E32F84 
+ 1424      53D100ED 
+ 1424      20FCB15B 
+ 1424      6ACBBE
+ 1425 035a 394A4C58 		.ascii	"9JLX\317\320\357\252\373CM3\205E\371\002\177P<\237\250"
+ 1425      CFD0EFAA 
+ 1425      FB434D33 
+ 1425      8545F902 
+ 1425      7F503C9F 
+ 1426 036f 51A3408F 		.ascii	"Q\243@\217\222\2358\365\274\266\332!\020\377\363\322"
+ 1426      929D38F5 
+ 1426      BCB6DA21 
+ 1426      10FFF3D2 
+ 1427 037f CD0C13EC 		.ascii	"\315\014\023\354_\227D\027\304\247~=d]\031s`\201O\334"
+ 1427      5F974417 
+ 1427      C4A77E3D 
+ 1427      645D1973 
+ 1427      60814FDC 
+ 1428 0393 222A9088 		.ascii	"\"*\220\210F\356\270\024\336^\013\333\3402:\012I\006"
+ 1428      46EEB814 
+ 1428      DE5E0BDB 
+ 1428      E0323A0A 
+ 1428      4906
+ 1429 03a5 245CC2D3 		.ascii	"$\\\302\323\254b\221\225\344y\347\3107m\215\325N\251"
+ 1429      AC629195 
+ 1429      E479E7C8 
+ 1429      376D8DD5 
+ 1429      4EA9
+ 1430 03b7 6C56F4EA 		.ascii	"lV\364\352ez\256\010\272x%.\034\246\264\306\350\335"
+ 1430      657AAE08 
+ 1430      BA78252E 
+ 1430      1CA6B4C6 
+ 1430      E8DD
+ 1431 03c9 741F4BBD 		.ascii	"t\037K\275\213\212p>\265fH\003\366\016a5W\271\206\301"
+ 1431      8B8A703E 
+ 1431      B5664803 
+ 1431      F60E6135 
+ 1431      57B986C1 
+ 1432 03dd 1D9EE1F8 		.ascii	"\035\236\341\370\230\021i\331\216\224\233\036\207\351"
+ 1432      981169D9 
+ 1432      8E949B1E 
+ 1432      87E9
+ 1433 03eb CE5528DF 		.ascii	"\316U(\337\214\241\211\015\277\346BhA\231-\017\260T"
+ 1433      8CA1890D 
+ 1433      BFE64268 
+ 1433      41992D0F 
+ 1433      B054
+ 1434 03fd BB16     		.ascii	"\273\026"
+ 1435              		.bss
+ 1436              		.align	2
+ 1437              		.set	.LANCHOR0,. + 0
+ 1440              	Mask:
+ 1441 0000 00000000 		.space	10
+ 1441      00000000 
+ 1441      0000
+ 1442 000a 0000     		.space	2
+ 1445              	WordMask:
+ 1446 000c 00000000 		.space	4
+ 1449              	roundKey:
+ 1450 0010 00000000 		.space	176
+ 1450      00000000 
+ 1450      00000000 
+ 1450      00000000 
+ 1450      00000000 
+ 1453              	RoundKey_masked:
+ 1454 00c0 00000000 		.space	176
+ 1454      00000000 
+ 1454      00000000 
+ 1454      00000000 
+ 1454      00000000 
+ 1457              	Sbox_masked:
+ 1458 0170 00000000 		.space	256
+ 1458      00000000 
+ 1458      00000000 
+ 1458      00000000 
+ 1458      00000000 
+ 1459              		.text
+ 1460              	.Letext0:
+ 1461              		.file 2 "/usr/arm-none-eabi/include/machine/_default_types.h"
+ 1462              		.file 3 "/usr/arm-none-eabi/include/sys/_stdint.h"
+ 1463              		.file 4 "byte_mask_aes.h"
+ 1464              		.file 5 ".././hal/stm32f0/stm32f0_hal.h"
+ 1465              		.file 6 "elmoasmfunctionsdef.h"
+ 1466              		.file 7 "<built-in>"
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 byte_mask_aes.c
+     /tmp/ccyxQuOY.s:16     .text.KeyExpansion:0000000000000000 $t
+     /tmp/ccyxQuOY.s:24     .text.KeyExpansion:0000000000000000 KeyExpansion
+     /tmp/ccyxQuOY.s:234    .text.KeyExpansion:0000000000000084 $d
+     /tmp/ccyxQuOY.s:1449   .bss:0000000000000010 roundKey
+     /tmp/ccyxQuOY.s:1419   .rodata:00000000000002ff sbox
+     /tmp/ccyxQuOY.s:1402   .rodata:0000000000000200 Rcon
+     /tmp/ccyxQuOY.s:241    .text.mixColumns:0000000000000000 $t
+     /tmp/ccyxQuOY.s:248    .text.mixColumns:0000000000000000 mixColumns
+     /tmp/ccyxQuOY.s:358    .text.mixColumns:0000000000000064 $d
+     /tmp/ccyxQuOY.s:1384   .rodata:0000000000000100 mul_02
+     /tmp/ccyxQuOY.s:1366   .rodata:0000000000000000 mul_03
+     /tmp/ccyxQuOY.s:364    .text.shiftRows:0000000000000000 $t
+     /tmp/ccyxQuOY.s:371    .text.shiftRows:0000000000000000 shiftRows
+     /tmp/ccyxQuOY.s:457    .text.addRoundKey_masked:0000000000000000 $t
+     /tmp/ccyxQuOY.s:464    .text.addRoundKey_masked:0000000000000000 addRoundKey_masked
+     /tmp/ccyxQuOY.s:508    .text.addRoundKey_masked:000000000000001c $d
+     /tmp/ccyxQuOY.s:1453   .bss:00000000000000c0 RoundKey_masked
+     /tmp/ccyxQuOY.s:513    .text.masked:0000000000000000 $t
+     /tmp/ccyxQuOY.s:520    .text.masked:0000000000000000 masked
+     /tmp/ccyxQuOY.s:558    .text.masked:0000000000000014 $d
+     /tmp/ccyxQuOY.s:1457   .bss:0000000000000170 Sbox_masked
+     /tmp/ccyxQuOY.s:563    .text.remask:0000000000000000 $t
+     /tmp/ccyxQuOY.s:570    .text.remask:0000000000000000 remask
+     /tmp/ccyxQuOY.s:676    .text.calcMixColMask:0000000000000000 $t
+     /tmp/ccyxQuOY.s:683    .text.calcMixColMask:0000000000000000 calcMixColMask
+     /tmp/ccyxQuOY.s:770    .text.calcMixColMask:0000000000000054 $d
+     /tmp/ccyxQuOY.s:777    .text.calcSbox_masked:0000000000000000 $t
+     /tmp/ccyxQuOY.s:784    .text.calcSbox_masked:0000000000000000 calcSbox_masked
+     /tmp/ccyxQuOY.s:846    .text.calcSbox_masked:0000000000000024 $d
+     /tmp/ccyxQuOY.s:853    .text.init_masked_round_keys:0000000000000000 $t
+     /tmp/ccyxQuOY.s:860    .text.init_masked_round_keys:0000000000000000 init_masked_round_keys
+     /tmp/ccyxQuOY.s:956    .text.init_masked_round_keys:0000000000000068 $d
+     /tmp/ccyxQuOY.s:963    .text.copy_key:0000000000000000 $t
+     /tmp/ccyxQuOY.s:970    .text.copy_key:0000000000000000 copy_key
+     /tmp/ccyxQuOY.s:1000   .text.copy_key:0000000000000010 $d
+     /tmp/ccyxQuOY.s:1006   .text.init_masking:0000000000000000 $t
+     /tmp/ccyxQuOY.s:1013   .text.init_masking:0000000000000000 init_masking
+     /tmp/ccyxQuOY.s:1047   .text.randomize_mask:0000000000000000 $t
+     /tmp/ccyxQuOY.s:1054   .text.randomize_mask:0000000000000000 randomize_mask
+     /tmp/ccyxQuOY.s:1120   .text.randomize_mask:000000000000004c $d
+     /tmp/ccyxQuOY.s:1125   .text.subBytes_masked:0000000000000000 $t
+     /tmp/ccyxQuOY.s:1132   .text.subBytes_masked:0000000000000000 subBytes_masked
+     /tmp/ccyxQuOY.s:1188   .text.subBytes_masked:0000000000000024 $d
+     /tmp/ccyxQuOY.s:1194   .text.maskstate:0000000000000000 $t
+     /tmp/ccyxQuOY.s:1201   .text.maskstate:0000000000000000 maskstate
+     /tmp/ccyxQuOY.s:1242   .text.maskstate:0000000000000024 $d
+     /tmp/ccyxQuOY.s:1247   .text.aes128:0000000000000000 $t
+     /tmp/ccyxQuOY.s:1254   .text.aes128:0000000000000000 aes128
+     /tmp/ccyxQuOY.s:1351   .text.aes128:0000000000000064 $d
+     /tmp/ccyxQuOY.s:1445   .bss:000000000000000c WordMask
+     /tmp/ccyxQuOY.s:1440   .bss:0000000000000000 Mask
+     /tmp/ccyxQuOY.s:1436   .bss:0000000000000000 $d
+
+UNDEFINED SYMBOLS
+memcpy
+randbyte
+trigger_high
+trigger_low

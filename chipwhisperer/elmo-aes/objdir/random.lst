@@ -1,0 +1,469 @@
+   1              		.cpu cortex-m0
+   2              		.eabi_attribute 20, 1
+   3              		.eabi_attribute 21, 1
+   4              		.eabi_attribute 23, 3
+   5              		.eabi_attribute 24, 1
+   6              		.eabi_attribute 25, 1
+   7              		.eabi_attribute 26, 1
+   8              		.eabi_attribute 30, 4
+   9              		.eabi_attribute 34, 0
+  10              		.eabi_attribute 18, 4
+  11              		.file	"random.c"
+  12              		.text
+  13              	.Ltext0:
+  14              		.cfi_sections	.debug_frame
+  15              		.section	.text.maskdata,"ax",%progbits
+  16              		.align	1
+  17              		.global	maskdata
+  18              		.arch armv6s-m
+  19              		.syntax unified
+  20              		.code	16
+  21              		.thumb_func
+  22              		.fpu softvfp
+  24              	maskdata:
+  25              	.LVL0:
+  26              	.LFB0:
+  27              		.file 1 "random.c"
+   1:random.c      **** /* Copyright 2020 University of Adelaide
+   2:random.c      ****  *
+   3:random.c      ****  * Licensed under the Apache License, Version 2.0 (the "License");
+   4:random.c      ****  * you may not use this file except in compliance with the License.
+   5:random.c      ****  * You may obtain a copy of the License at
+   6:random.c      ****  * 
+   7:random.c      ****  *    http://www.apache.org/licenses/LICENSE-2.0
+   8:random.c      ****  * 
+   9:random.c      ****  * Unless required by applicable law or agreed to in writing, software
+  10:random.c      ****  * distributed under the License is distributed on an "AS IS" BASIS,
+  11:random.c      ****  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  12:random.c      ****  * See the License for the specific language governing permissions and
+  13:random.c      ****  * limitations under the License.
+  14:random.c      ****  */
+  15:random.c      **** 
+  16:random.c      **** #include <stdint.h>
+  17:random.c      **** 
+  18:random.c      **** uint32_t ui32randval = 0;
+  19:random.c      **** uint8_t ui8randval = 0;
+  20:random.c      **** uint8_t mask[16] = {};
+  21:random.c      **** #ifdef TEST
+  22:random.c      **** #endif
+  23:random.c      **** 
+  24:random.c      **** #include "elmoasmfunctionsdef.h"
+  25:random.c      **** 
+  26:random.c      **** 
+  27:random.c      **** /* these masked data functions use ELMO's randbyte() to get better 
+  28:random.c      ****  * quality uniform random numbers
+  29:random.c      ****  * 
+  30:random.c      ****  */
+  31:random.c      **** void maskdata(uint8_t*  data)
+  32:random.c      **** {
+  28              		.loc 1 32 1 view -0
+  29              		.cfi_startproc
+  30              		@ args = 0, pretend = 0, frame = 8
+  31              		@ frame_needed = 0, uses_anonymous_args = 0
+  33:random.c      **** 	int i=0;
+  32              		.loc 1 33 2 view .LVU1
+  34:random.c      **** 	for (;i<16;i++)
+  33              		.loc 1 34 2 view .LVU2
+  34              		.loc 1 34 9 view .LVU3
+  32:random.c      **** 	int i=0;
+  35              		.loc 1 32 1 is_stmt 0 view .LVU4
+  36 0000 73B5     		push	{r0, r1, r4, r5, r6, lr}
+  37              	.LCFI0:
+  38              		.cfi_def_cfa_offset 24
+  39              		.cfi_offset 0, -24
+  40              		.cfi_offset 1, -20
+  41              		.cfi_offset 4, -16
+  42              		.cfi_offset 5, -12
+  43              		.cfi_offset 6, -8
+  44              		.cfi_offset 14, -4
+  32:random.c      **** 	int i=0;
+  45              		.loc 1 32 1 view .LVU5
+  46 0002 0500     		movs	r5, r0
+  33:random.c      **** 	int i=0;
+  47              		.loc 1 33 6 view .LVU6
+  48 0004 0024     		movs	r4, #0
+  49              	.LVL1:
+  50              	.L2:
+  51              	.LBB2:
+  35:random.c      **** 	{
+  36:random.c      **** 		uint8_t rr;
+  52              		.loc 1 36 3 is_stmt 1 discriminator 2 view .LVU7
+  37:random.c      **** 		randbyte(&rr);
+  53              		.loc 1 37 3 discriminator 2 view .LVU8
+  54 0006 6B46     		mov	r3, sp
+  55 0008 DE1D     		adds	r6, r3, #7
+  56 000a 3000     		movs	r0, r6
+  57 000c FFF7FEFF 		bl	randbyte
+  58              	.LVL2:
+  38:random.c      **** 		mask[i] = rr;
+  59              		.loc 1 38 3 discriminator 2 view .LVU9
+  60              		.loc 1 38 11 is_stmt 0 discriminator 2 view .LVU10
+  61 0010 3378     		ldrb	r3, [r6]
+  62 0012 044A     		ldr	r2, .L4
+  63 0014 A354     		strb	r3, [r4, r2]
+  39:random.c      **** 		data[i] ^= rr;
+  64              		.loc 1 39 3 is_stmt 1 discriminator 2 view .LVU11
+  65              		.loc 1 39 11 is_stmt 0 discriminator 2 view .LVU12
+  66 0016 2A5D     		ldrb	r2, [r5, r4]
+  67 0018 5340     		eors	r3, r2
+  68 001a 2B55     		strb	r3, [r5, r4]
+  69              	.LBE2:
+  34:random.c      **** 	{
+  70              		.loc 1 34 14 is_stmt 1 discriminator 2 view .LVU13
+  71 001c 0134     		adds	r4, r4, #1
+  72              	.LVL3:
+  34:random.c      **** 	{
+  73              		.loc 1 34 9 discriminator 2 view .LVU14
+  74 001e 102C     		cmp	r4, #16
+  75 0020 F1D1     		bne	.L2
+  40:random.c      **** 	}
+  41:random.c      **** }
+  76              		.loc 1 41 1 is_stmt 0 view .LVU15
+  77              		@ sp needed
+  78              	.LVL4:
+  79              	.LVL5:
+  80              		.loc 1 41 1 view .LVU16
+  81 0022 73BD     		pop	{r0, r1, r4, r5, r6, pc}
+  82              	.L5:
+  83              		.align	2
+  84              	.L4:
+  85 0024 00000000 		.word	.LANCHOR0
+  86              		.cfi_endproc
+  87              	.LFE0:
+  89              		.section	.text.unmaskdata,"ax",%progbits
+  90              		.align	1
+  91              		.global	unmaskdata
+  92              		.syntax unified
+  93              		.code	16
+  94              		.thumb_func
+  95              		.fpu softvfp
+  97              	unmaskdata:
+  98              	.LVL6:
+  99              	.LFB1:
+  42:random.c      **** 
+  43:random.c      **** void unmaskdata(uint8_t* data)
+  44:random.c      **** {
+ 100              		.loc 1 44 1 is_stmt 1 view -0
+ 101              		.cfi_startproc
+ 102              		@ args = 0, pretend = 0, frame = 0
+ 103              		@ frame_needed = 0, uses_anonymous_args = 0
+  45:random.c      **** 	int i=0;
+ 104              		.loc 1 45 2 view .LVU18
+  46:random.c      ****         for (;i<16;i++)
+ 105              		.loc 1 46 9 view .LVU19
+ 106              		.loc 1 46 16 view .LVU20
+  45:random.c      **** 	int i=0;
+ 107              		.loc 1 45 6 is_stmt 0 view .LVU21
+ 108 0000 0023     		movs	r3, #0
+  44:random.c      **** 	int i=0;
+ 109              		.loc 1 44 1 view .LVU22
+ 110 0002 10B5     		push	{r4, lr}
+ 111              	.LCFI1:
+ 112              		.cfi_def_cfa_offset 8
+ 113              		.cfi_offset 4, -8
+ 114              		.cfi_offset 14, -4
+  47:random.c      ****         {
+  48:random.c      ****                 data[i] ^= mask[i];
+ 115              		.loc 1 48 32 view .LVU23
+ 116 0004 044C     		ldr	r4, .L9
+ 117              	.LVL7:
+ 118              	.L7:
+ 119              		.loc 1 48 17 is_stmt 1 discriminator 2 view .LVU24
+ 120              		.loc 1 48 25 is_stmt 0 discriminator 2 view .LVU25
+ 121 0006 C25C     		ldrb	r2, [r0, r3]
+ 122 0008 195D     		ldrb	r1, [r3, r4]
+ 123 000a 4A40     		eors	r2, r1
+ 124 000c C254     		strb	r2, [r0, r3]
+  46:random.c      ****         {
+ 125              		.loc 1 46 21 is_stmt 1 discriminator 2 view .LVU26
+ 126 000e 0133     		adds	r3, r3, #1
+ 127              	.LVL8:
+  46:random.c      ****         {
+ 128              		.loc 1 46 16 discriminator 2 view .LVU27
+ 129 0010 102B     		cmp	r3, #16
+ 130 0012 F8D1     		bne	.L7
+  49:random.c      ****         }
+  50:random.c      **** }
+ 131              		.loc 1 50 1 is_stmt 0 view .LVU28
+ 132              		@ sp needed
+ 133 0014 10BD     		pop	{r4, pc}
+ 134              	.L10:
+ 135 0016 C046     		.align	2
+ 136              	.L9:
+ 137 0018 00000000 		.word	.LANCHOR0
+ 138              		.cfi_endproc
+ 139              	.LFE1:
+ 141              		.section	.text.setseed,"ax",%progbits
+ 142              		.align	1
+ 143              		.global	setseed
+ 144              		.syntax unified
+ 145              		.code	16
+ 146              		.thumb_func
+ 147              		.fpu softvfp
+ 149              	setseed:
+ 150              	.LVL9:
+ 151              	.LFB2:
+  51:random.c      **** 
+  52:random.c      **** void setseed(int newseed)
+  53:random.c      **** {
+ 152              		.loc 1 53 1 is_stmt 1 view -0
+ 153              		.cfi_startproc
+ 154              		@ args = 0, pretend = 0, frame = 0
+ 155              		@ frame_needed = 0, uses_anonymous_args = 0
+ 156              		@ link register save eliminated.
+  54:random.c      **** 	ui32randval = 0;
+ 157              		.loc 1 54 2 view .LVU30
+ 158              		.loc 1 54 14 is_stmt 0 view .LVU31
+ 159 0000 0022     		movs	r2, #0
+  55:random.c      **** }
+ 160              		.loc 1 55 1 view .LVU32
+ 161              		@ sp needed
+  54:random.c      **** 	ui32randval = 0;
+ 162              		.loc 1 54 14 view .LVU33
+ 163 0002 014B     		ldr	r3, .L12
+ 164 0004 1A61     		str	r2, [r3, #16]
+ 165              		.loc 1 55 1 view .LVU34
+ 166 0006 7047     		bx	lr
+ 167              	.L13:
+ 168              		.align	2
+ 169              	.L12:
+ 170 0008 00000000 		.word	.LANCHOR0
+ 171              		.cfi_endproc
+ 172              	.LFE2:
+ 174              		.section	.text.runrand,"ax",%progbits
+ 175              		.align	1
+ 176              		.global	runrand
+ 177              		.syntax unified
+ 178              		.code	16
+ 179              		.thumb_func
+ 180              		.fpu softvfp
+ 182              	runrand:
+ 183              	.LFB3:
+  56:random.c      **** 
+  57:random.c      **** void runrand()
+  58:random.c      **** {
+ 184              		.loc 1 58 1 is_stmt 1 view -0
+ 185              		.cfi_startproc
+ 186              		@ args = 0, pretend = 0, frame = 0
+ 187              		@ frame_needed = 0, uses_anonymous_args = 0
+  59:random.c      **** 	uint8_t *rr=(uint8_t*)&ui32randval;
+ 188              		.loc 1 59 2 view .LVU36
+ 189              	.LVL10:
+  60:random.c      **** 	randbyte(&rr[0]);
+ 190              		.loc 1 60 2 view .LVU37
+  58:random.c      **** 	uint8_t *rr=(uint8_t*)&ui32randval;
+ 191              		.loc 1 58 1 is_stmt 0 view .LVU38
+ 192 0000 10B5     		push	{r4, lr}
+ 193              	.LCFI2:
+ 194              		.cfi_def_cfa_offset 8
+ 195              		.cfi_offset 4, -8
+ 196              		.cfi_offset 14, -4
+ 197              		.loc 1 60 2 view .LVU39
+ 198 0002 0C4C     		ldr	r4, .L15
+ 199 0004 2000     		movs	r0, r4
+ 200 0006 1030     		adds	r0, r0, #16
+ 201 0008 FFF7FEFF 		bl	randbyte
+ 202              	.LVL11:
+  61:random.c      **** 	randbyte(&rr[2]);
+ 203              		.loc 1 61 2 is_stmt 1 view .LVU40
+ 204 000c 2000     		movs	r0, r4
+ 205 000e 1230     		adds	r0, r0, #18
+ 206 0010 FFF7FEFF 		bl	randbyte
+ 207              	.LVL12:
+  62:random.c      **** 	randbyte(&rr[1]);
+ 208              		.loc 1 62 2 view .LVU41
+ 209 0014 2000     		movs	r0, r4
+ 210 0016 1130     		adds	r0, r0, #17
+ 211 0018 FFF7FEFF 		bl	randbyte
+ 212              	.LVL13:
+  63:random.c      **** 	randbyte(&rr[3]);
+ 213              		.loc 1 63 2 view .LVU42
+ 214 001c 2000     		movs	r0, r4
+ 215 001e 1330     		adds	r0, r0, #19
+ 216 0020 FFF7FEFF 		bl	randbyte
+ 217              	.LVL14:
+  64:random.c      **** #ifdef __arm__
+  65:random.c      **** 	asm("mov r7, %[value]" 
+ 218              		.loc 1 65 2 view .LVU43
+ 219 0024 2369     		ldr	r3, [r4, #16]
+ 220              		.syntax divided
+ 221              	@ 65 "random.c" 1
+ 222 0026 1F1C     		mov r7, r3
+ 223              	@ 0 "" 2
+  66:random.c      **** 		:
+  67:random.c      **** 		: [value] "r" (ui32randval));
+  68:random.c      **** #endif
+  69:random.c      **** 	randbyte(&ui8randval);
+ 224              		.loc 1 69 2 view .LVU44
+ 225              		.thumb
+ 226              		.syntax unified
+ 227 0028 2000     		movs	r0, r4
+  70:random.c      **** 
+  71:random.c      **** }
+ 228              		.loc 1 71 1 is_stmt 0 view .LVU45
+ 229              		@ sp needed
+  69:random.c      **** 
+ 230              		.loc 1 69 2 view .LVU46
+ 231 002a 1430     		adds	r0, r0, #20
+ 232 002c FFF7FEFF 		bl	randbyte
+ 233              	.LVL15:
+ 234              		.loc 1 71 1 view .LVU47
+ 235 0030 10BD     		pop	{r4, pc}
+ 236              	.L16:
+ 237 0032 C046     		.align	2
+ 238              	.L15:
+ 239 0034 00000000 		.word	.LANCHOR0
+ 240              		.cfi_endproc
+ 241              	.LFE3:
+ 243              		.section	.text.readrandombyte,"ax",%progbits
+ 244              		.align	1
+ 245              		.global	readrandombyte
+ 246              		.syntax unified
+ 247              		.code	16
+ 248              		.thumb_func
+ 249              		.fpu softvfp
+ 251              	readrandombyte:
+ 252              	.LVL16:
+ 253              	.LFB4:
+  72:random.c      **** void readrandombyte(unsigned char* byte)
+  73:random.c      **** {
+ 254              		.loc 1 73 1 is_stmt 1 view -0
+ 255              		.cfi_startproc
+ 256              		@ args = 0, pretend = 0, frame = 0
+ 257              		@ frame_needed = 0, uses_anonymous_args = 0
+  74:random.c      ****     randbyte(byte);
+ 258              		.loc 1 74 5 view .LVU49
+  73:random.c      ****     randbyte(byte);
+ 259              		.loc 1 73 1 is_stmt 0 view .LVU50
+ 260 0000 10B5     		push	{r4, lr}
+ 261              	.LCFI3:
+ 262              		.cfi_def_cfa_offset 8
+ 263              		.cfi_offset 4, -8
+ 264              		.cfi_offset 14, -4
+ 265              		.loc 1 74 5 view .LVU51
+ 266 0002 FFF7FEFF 		bl	randbyte
+ 267              	.LVL17:
+  75:random.c      **** }
+ 268              		.loc 1 75 1 view .LVU52
+ 269              		@ sp needed
+ 270 0006 10BD     		pop	{r4, pc}
+ 271              		.cfi_endproc
+ 272              	.LFE4:
+ 274              		.section	.text.getrandui32,"ax",%progbits
+ 275              		.align	1
+ 276              		.global	getrandui32
+ 277              		.syntax unified
+ 278              		.code	16
+ 279              		.thumb_func
+ 280              		.fpu softvfp
+ 282              	getrandui32:
+ 283              	.LFB5:
+  76:random.c      **** uint32_t getrandui32()
+  77:random.c      **** {
+ 284              		.loc 1 77 1 is_stmt 1 view -0
+ 285              		.cfi_startproc
+ 286              		@ args = 0, pretend = 0, frame = 0
+ 287              		@ frame_needed = 0, uses_anonymous_args = 0
+ 288              		@ link register save eliminated.
+  78:random.c      **** 	return ui32randval;
+ 289              		.loc 1 78 2 view .LVU54
+ 290              		.loc 1 78 9 is_stmt 0 view .LVU55
+ 291 0000 014B     		ldr	r3, .L19
+  79:random.c      **** }
+ 292              		.loc 1 79 1 view .LVU56
+ 293              		@ sp needed
+  78:random.c      **** 	return ui32randval;
+ 294              		.loc 1 78 9 view .LVU57
+ 295 0002 1869     		ldr	r0, [r3, #16]
+ 296              		.loc 1 79 1 view .LVU58
+ 297 0004 7047     		bx	lr
+ 298              	.L20:
+ 299 0006 C046     		.align	2
+ 300              	.L19:
+ 301 0008 00000000 		.word	.LANCHOR0
+ 302              		.cfi_endproc
+ 303              	.LFE5:
+ 305              		.section	.text.getrandui8,"ax",%progbits
+ 306              		.align	1
+ 307              		.global	getrandui8
+ 308              		.syntax unified
+ 309              		.code	16
+ 310              		.thumb_func
+ 311              		.fpu softvfp
+ 313              	getrandui8:
+ 314              	.LFB6:
+  80:random.c      **** 
+  81:random.c      **** uint8_t getrandui8()
+  82:random.c      **** {
+ 315              		.loc 1 82 1 is_stmt 1 view -0
+ 316              		.cfi_startproc
+ 317              		@ args = 0, pretend = 0, frame = 0
+ 318              		@ frame_needed = 0, uses_anonymous_args = 0
+ 319              		@ link register save eliminated.
+  83:random.c      ****     return ui8randval;
+ 320              		.loc 1 83 5 view .LVU60
+ 321              		.loc 1 83 12 is_stmt 0 view .LVU61
+ 322 0000 014B     		ldr	r3, .L22
+  84:random.c      **** }
+ 323              		.loc 1 84 1 view .LVU62
+ 324              		@ sp needed
+  83:random.c      ****     return ui8randval;
+ 325              		.loc 1 83 12 view .LVU63
+ 326 0002 187D     		ldrb	r0, [r3, #20]
+ 327              		.loc 1 84 1 view .LVU64
+ 328 0004 7047     		bx	lr
+ 329              	.L23:
+ 330 0006 C046     		.align	2
+ 331              	.L22:
+ 332 0008 00000000 		.word	.LANCHOR0
+ 333              		.cfi_endproc
+ 334              	.LFE6:
+ 336              		.global	mask
+ 337              		.global	ui8randval
+ 338              		.global	ui32randval
+ 339              		.bss
+ 340              		.align	2
+ 341              		.set	.LANCHOR0,. + 0
+ 344              	mask:
+ 345 0000 00000000 		.space	16
+ 345      00000000 
+ 345      00000000 
+ 345      00000000 
+ 348              	ui32randval:
+ 349 0010 00000000 		.space	4
+ 352              	ui8randval:
+ 353 0014 00       		.space	1
+ 354              		.text
+ 355              	.Letext0:
+ 356              		.file 2 "/usr/arm-none-eabi/include/machine/_default_types.h"
+ 357              		.file 3 "/usr/arm-none-eabi/include/sys/_stdint.h"
+ 358              		.file 4 "elmoasmfunctionsdef.h"
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 random.c
+     /tmp/ccC8VBAj.s:16     .text.maskdata:0000000000000000 $t
+     /tmp/ccC8VBAj.s:24     .text.maskdata:0000000000000000 maskdata
+     /tmp/ccC8VBAj.s:85     .text.maskdata:0000000000000024 $d
+     /tmp/ccC8VBAj.s:90     .text.unmaskdata:0000000000000000 $t
+     /tmp/ccC8VBAj.s:97     .text.unmaskdata:0000000000000000 unmaskdata
+     /tmp/ccC8VBAj.s:137    .text.unmaskdata:0000000000000018 $d
+     /tmp/ccC8VBAj.s:142    .text.setseed:0000000000000000 $t
+     /tmp/ccC8VBAj.s:149    .text.setseed:0000000000000000 setseed
+     /tmp/ccC8VBAj.s:170    .text.setseed:0000000000000008 $d
+     /tmp/ccC8VBAj.s:175    .text.runrand:0000000000000000 $t
+     /tmp/ccC8VBAj.s:182    .text.runrand:0000000000000000 runrand
+     /tmp/ccC8VBAj.s:239    .text.runrand:0000000000000034 $d
+     /tmp/ccC8VBAj.s:244    .text.readrandombyte:0000000000000000 $t
+     /tmp/ccC8VBAj.s:251    .text.readrandombyte:0000000000000000 readrandombyte
+     /tmp/ccC8VBAj.s:275    .text.getrandui32:0000000000000000 $t
+     /tmp/ccC8VBAj.s:282    .text.getrandui32:0000000000000000 getrandui32
+     /tmp/ccC8VBAj.s:301    .text.getrandui32:0000000000000008 $d
+     /tmp/ccC8VBAj.s:306    .text.getrandui8:0000000000000000 $t
+     /tmp/ccC8VBAj.s:313    .text.getrandui8:0000000000000000 getrandui8
+     /tmp/ccC8VBAj.s:332    .text.getrandui8:0000000000000008 $d
+     /tmp/ccC8VBAj.s:344    .bss:0000000000000000 mask
+     /tmp/ccC8VBAj.s:352    .bss:0000000000000014 ui8randval
+     /tmp/ccC8VBAj.s:348    .bss:0000000000000010 ui32randval
+     /tmp/ccC8VBAj.s:340    .bss:0000000000000000 $d
+
+UNDEFINED SYMBOLS
+randbyte

@@ -1,0 +1,784 @@
+   1              		.cpu cortex-m0
+   2              		.eabi_attribute 20, 1
+   3              		.eabi_attribute 21, 1
+   4              		.eabi_attribute 23, 3
+   5              		.eabi_attribute 24, 1
+   6              		.eabi_attribute 25, 1
+   7              		.eabi_attribute 26, 1
+   8              		.eabi_attribute 30, 4
+   9              		.eabi_attribute 34, 0
+  10              		.eabi_attribute 18, 4
+  11              		.file	"simple.c"
+  12              		.text
+  13              	.Ltext0:
+  14              		.cfi_sections	.debug_frame
+  15              		.section	.text.stack_clear,"ax",%progbits
+  16              		.align	1
+  17              		.global	stack_clear
+  18              		.arch armv6s-m
+  19              		.syntax unified
+  20              		.code	16
+  21              		.thumb_func
+  22              		.fpu softvfp
+  24              	stack_clear:
+  25              	.LFB3:
+  26              		.file 1 "simple.c"
+   1:simple.c      **** /* Copyright 2020 University of Adelaide
+   2:simple.c      ****  *
+   3:simple.c      ****  * Licensed under the Apache License, Version 2.0 (the "License");
+   4:simple.c      ****  * you may not use this file except in compliance with the License.
+   5:simple.c      ****  * You may obtain a copy of the License at
+   6:simple.c      ****  * 
+   7:simple.c      ****  *    http://www.apache.org/licenses/LICENSE-2.0
+   8:simple.c      ****  * 
+   9:simple.c      ****  * Unless required by applicable law or agreed to in writing, software
+  10:simple.c      ****  * distributed under the License is distributed on an "AS IS" BASIS,
+  11:simple.c      ****  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  12:simple.c      ****  * See the License for the specific language governing permissions and
+  13:simple.c      ****  * limitations under the License.
+  14:simple.c      ****  */
+  15:simple.c      **** 
+  16:simple.c      **** #define NTRACES /*@NTRACES{*/ 20000 /*}*/
+  17:simple.c      **** #define TEST_TRACES (NTRACES/2)
+  18:simple.c      **** 
+  19:simple.c      **** #include <stdio.h>
+  20:simple.c      **** #include <stdlib.h>
+  21:simple.c      **** 
+  22:simple.c      **** #include "byte_mask_aes.h"
+  23:simple.c      **** #include "elmoasmfunctionsdef.h"
+  24:simple.c      **** #define ALIGN __attribute__ ((aligned (4)))
+  25:simple.c      **** /*
+  26:simple.c      ****  * 4 byte align arrays to make sure we don't load invalid data
+  27:simple.c      ****  * for state of byte-wise operations (ARM loads/stores 4 bytes
+  28:simple.c      ****  * from addr & ~(0b11) when load/storing from address addr).
+  29:simple.c      ****  * In ARM, Addresses that are not divisable by 4 are invalid when used
+  30:simple.c      ****  * with wordwise instructions (ldr, str)
+  31:simple.c      ****  */ 
+  32:simple.c      **** volatile uint8_t input_copy[16] ALIGN;
+  33:simple.c      **** volatile uint8_t input[16] ALIGN;
+  34:simple.c      **** volatile uint8_t output[16] ALIGN;
+  35:simple.c      **** volatile uint8_t randombuf[16] ALIGN;
+  36:simple.c      **** volatile uint8_t key[16] ALIGN;
+  37:simple.c      **** volatile uint8_t throwaway[16] ALIGN;
+  38:simple.c      **** volatile uint8_t rk[11*16] ALIGN;
+  39:simple.c      **** volatile int domask=1;
+  40:simple.c      **** 
+  41:simple.c      **** 
+  42:simple.c      **** extern void runrand();
+  43:simple.c      **** 
+  44:simple.c      **** extern void AES_128_keyschedule(const uint8_t *, uint8_t *);
+  45:simple.c      **** extern void AES_128_keyschedule_dec(const uint8_t *, uint8_t *);
+  46:simple.c      **** extern void AES_128_encrypt(const uint8_t *, const uint8_t *, uint8_t *);
+  47:simple.c      **** extern void AES_128_decrypt(const uint8_t *, const uint8_t *, uint8_t *);
+  48:simple.c      **** /* 
+  49:simple.c      ****  * Clear stack using a volatile buffer so that at each run the stack
+  50:simple.c      ****  * is the same otherwise content from the previous run ends up leaking
+  51:simple.c      ****  * this can be also mitigated by running each test on a coin flip (this 
+  52:simple.c      ****  * is the way how that the real world counterpart of this test is being run).
+  53:simple.c      ****  * However, as this is a simulated run -- we know what state related effects
+  54:simple.c      ****  * change affect the T-test values therefore we clear all state related 
+  55:simple.c      ****  * interactions.
+  56:simple.c      ****  */
+  57:simple.c      **** void stack_clear()
+  58:simple.c      **** {
+  27              		.loc 1 58 1 view -0
+  28              		.cfi_startproc
+  29              		@ args = 0, pretend = 0, frame = 1024
+  30              		@ frame_needed = 0, uses_anonymous_args = 0
+  59:simple.c      ****     volatile uint8_t arr[1024];
+  31              		.loc 1 59 5 view .LVU1
+  60:simple.c      ****     int i=0;
+  32              		.loc 1 60 5 view .LVU2
+  33              	.LVL0:
+  61:simple.c      ****     for (i=0;i<1024;i++)
+  34              		.loc 1 61 5 view .LVU3
+  35              		.loc 1 61 15 view .LVU4
+  36              		.loc 1 61 11 is_stmt 0 view .LVU5
+  37 0000 0023     		movs	r3, #0
+  38              		.loc 1 61 15 view .LVU6
+  39 0002 8022     		movs	r2, #128
+  62:simple.c      ****     {
+  63:simple.c      ****         arr[i] = 0;
+  40              		.loc 1 63 16 view .LVU7
+  41 0004 1900     		movs	r1, r3
+  58:simple.c      ****     volatile uint8_t arr[1024];
+  42              		.loc 1 58 1 view .LVU8
+  43 0006 80B4     		push	{r7}
+  44              	.LCFI0:
+  45              		.cfi_def_cfa_offset 4
+  46              		.cfi_offset 7, -4
+  47 0008 054F     		ldr	r7, .L4
+  61:simple.c      ****     for (i=0;i<1024;i++)
+  48              		.loc 1 61 15 view .LVU9
+  49 000a D200     		lsls	r2, r2, #3
+  58:simple.c      ****     volatile uint8_t arr[1024];
+  50              		.loc 1 58 1 view .LVU10
+  51 000c BD44     		add	sp, sp, r7
+  52              	.LCFI1:
+  53              		.cfi_def_cfa_offset 1032
+  54              	.LVL1:
+  55              	.L2:
+  56              		.loc 1 63 9 is_stmt 1 discriminator 3 view .LVU11
+  57              		.loc 1 63 16 is_stmt 0 discriminator 3 view .LVU12
+  58 000e 6846     		mov	r0, sp
+  59 0010 C154     		strb	r1, [r0, r3]
+  61:simple.c      ****     for (i=0;i<1024;i++)
+  60              		.loc 1 61 22 is_stmt 1 discriminator 3 view .LVU13
+  61 0012 0133     		adds	r3, r3, #1
+  62              	.LVL2:
+  61:simple.c      ****     for (i=0;i<1024;i++)
+  63              		.loc 1 61 15 discriminator 3 view .LVU14
+  64 0014 9342     		cmp	r3, r2
+  65 0016 FAD1     		bne	.L2
+  64:simple.c      ****     }
+  65:simple.c      **** }
+  66              		.loc 1 65 1 is_stmt 0 view .LVU15
+  67 0018 024B     		ldr	r3, .L4+4
+  68              	.LVL3:
+  69              		.loc 1 65 1 view .LVU16
+  70 001a 9D44     		add	sp, sp, r3
+  71              		@ sp needed
+  72 001c 80BC     		pop	{r7}
+  73 001e 7047     		bx	lr
+  74              	.L5:
+  75              		.align	2
+  76              	.L4:
+  77 0020 FCFBFFFF 		.word	-1028
+  78 0024 04040000 		.word	1028
+  79              		.cfi_endproc
+  80              	.LFE3:
+  82              		.section	.text.run_byte_aes_masked_,"ax",%progbits
+  83              		.align	1
+  84              		.global	run_byte_aes_masked_
+  85              		.syntax unified
+  86              		.code	16
+  87              		.thumb_func
+  88              		.fpu softvfp
+  90              	run_byte_aes_masked_:
+  91              	.LVL4:
+  92              	.LFB4:
+  66:simple.c      **** void run_byte_aes_masked_(uint8_t* inputbuf, uint8_t* keybuf)
+  67:simple.c      **** {
+  93              		.loc 1 67 1 is_stmt 1 view -0
+  94              		.cfi_startproc
+  95              		@ args = 0, pretend = 0, frame = 8
+  96              		@ frame_needed = 0, uses_anonymous_args = 0
+  68:simple.c      ****     int i,j;
+  97              		.loc 1 68 5 view .LVU18
+  69:simple.c      ****     unsigned char testthrowaway;
+  98              		.loc 1 69 5 view .LVU19
+  70:simple.c      **** /*
+  71:simple.c      ****     readrandombyte(&testthrowaway);
+  72:simple.c      ****     
+  73:simple.c      ****     for(j=0;j<16;j++)
+  74:simple.c      ****     {
+  75:simple.c      ****         readrandombyte(&randombuf[j]);
+  76:simple.c      ****     }*/
+  77:simple.c      ****     for(j=0;j<16;j++)
+  99              		.loc 1 77 5 view .LVU20
+ 100              		.loc 1 77 14 view .LVU21
+ 101              		.loc 1 77 10 is_stmt 0 view .LVU22
+ 102 0000 0023     		movs	r3, #0
+  67:simple.c      ****     int i,j;
+ 103              		.loc 1 67 1 view .LVU23
+ 104 0002 37B5     		push	{r0, r1, r2, r4, r5, lr}
+ 105              	.LCFI2:
+ 106              		.cfi_def_cfa_offset 24
+ 107              		.cfi_offset 0, -24
+ 108              		.cfi_offset 1, -20
+ 109              		.cfi_offset 2, -16
+ 110              		.cfi_offset 4, -12
+ 111              		.cfi_offset 5, -8
+ 112              		.cfi_offset 14, -4
+  78:simple.c      ****     {
+  79:simple.c      ****         output[j] = inputbuf[j];
+ 113              		.loc 1 79 19 view .LVU24
+ 114 0004 214C     		ldr	r4, .L11
+ 115              	.LVL5:
+ 116              	.L7:
+ 117              		.loc 1 79 9 is_stmt 1 discriminator 3 view .LVU25
+ 118              		.loc 1 79 29 is_stmt 0 discriminator 3 view .LVU26
+ 119 0006 C25C     		ldrb	r2, [r0, r3]
+ 120              		.loc 1 79 19 discriminator 3 view .LVU27
+ 121 0008 E254     		strb	r2, [r4, r3]
+  80:simple.c      ****         key[j] = keybuf[j];
+ 122              		.loc 1 80 9 is_stmt 1 discriminator 3 view .LVU28
+ 123              		.loc 1 80 24 is_stmt 0 discriminator 3 view .LVU29
+ 124 000a CD5C     		ldrb	r5, [r1, r3]
+ 125              		.loc 1 80 16 discriminator 3 view .LVU30
+ 126 000c E218     		adds	r2, r4, r3
+  77:simple.c      ****     {
+ 127              		.loc 1 77 19 discriminator 3 view .LVU31
+ 128 000e 0133     		adds	r3, r3, #1
+ 129              	.LVL6:
+ 130              		.loc 1 80 16 discriminator 3 view .LVU32
+ 131 0010 1574     		strb	r5, [r2, #16]
+  77:simple.c      ****     {
+ 132              		.loc 1 77 19 is_stmt 1 discriminator 3 view .LVU33
+ 133              	.LVL7:
+  77:simple.c      ****     {
+ 134              		.loc 1 77 14 discriminator 3 view .LVU34
+ 135 0012 102B     		cmp	r3, #16
+ 136 0014 F7D1     		bne	.L7
+  81:simple.c      ****     }
+  82:simple.c      **** 
+  83:simple.c      ****     readrandombyte(&testthrowaway);
+ 137              		.loc 1 83 5 view .LVU35
+ 138 0016 6B46     		mov	r3, sp
+ 139              	.LVL8:
+ 140              		.loc 1 83 5 is_stmt 0 view .LVU36
+ 141 0018 D81D     		adds	r0, r3, #7
+ 142              	.LVL9:
+ 143              		.loc 1 83 5 view .LVU37
+ 144 001a FFF7FEFF 		bl	readrandombyte
+ 145              	.LVL10:
+  84:simple.c      ****     readrandombyte(&testthrowaway);
+ 146              		.loc 1 84 5 is_stmt 1 view .LVU38
+ 147 001e 6B46     		mov	r3, sp
+ 148 0020 D81D     		adds	r0, r3, #7
+ 149 0022 FFF7FEFF 		bl	readrandombyte
+ 150              	.LVL11:
+  85:simple.c      ****     readrandombyte(&testthrowaway);
+ 151              		.loc 1 85 5 view .LVU39
+ 152 0026 6B46     		mov	r3, sp
+ 153 0028 D81D     		adds	r0, r3, #7
+ 154 002a FFF7FEFF 		bl	readrandombyte
+ 155              	.LVL12:
+  86:simple.c      ****     readrandombyte(&testthrowaway);
+ 156              		.loc 1 86 5 view .LVU40
+ 157 002e 6B46     		mov	r3, sp
+ 158 0030 D81D     		adds	r0, r3, #7
+ 159 0032 FFF7FEFF 		bl	readrandombyte
+ 160              	.LVL13:
+  87:simple.c      ****     readrandombyte(&testthrowaway);
+ 161              		.loc 1 87 5 view .LVU41
+ 162 0036 6B46     		mov	r3, sp
+ 163 0038 D81D     		adds	r0, r3, #7
+ 164 003a FFF7FEFF 		bl	readrandombyte
+ 165              	.LVL14:
+  88:simple.c      ****     readrandombyte(&testthrowaway);
+ 166              		.loc 1 88 5 view .LVU42
+ 167 003e 6B46     		mov	r3, sp
+ 168 0040 D81D     		adds	r0, r3, #7
+ 169 0042 FFF7FEFF 		bl	readrandombyte
+ 170              	.LVL15:
+  89:simple.c      ****     
+  90:simple.c      ****     runrand();
+ 171              		.loc 1 90 5 view .LVU43
+ 172 0046 FFF7FEFF 		bl	runrand
+ 173              	.LVL16:
+  91:simple.c      ****     
+  92:simple.c      ****     KeyExpansion(key);
+ 174              		.loc 1 92 5 view .LVU44
+ 175 004a 2000     		movs	r0, r4
+ 176 004c 1030     		adds	r0, r0, #16
+ 177 004e FFF7FEFF 		bl	KeyExpansion
+ 178              	.LVL17:
+  93:simple.c      **** 
+  94:simple.c      ****     randomize_mask();
+ 179              		.loc 1 94 5 view .LVU45
+ 180 0052 FFF7FEFF 		bl	randomize_mask
+ 181              	.LVL18:
+  95:simple.c      ****     init_masking();
+ 182              		.loc 1 95 5 view .LVU46
+ 183 0056 FFF7FEFF 		bl	init_masking
+ 184              	.LVL19:
+  96:simple.c      ****     maskstate(output);
+ 185              		.loc 1 96 5 view .LVU47
+ 186 005a 2000     		movs	r0, r4
+ 187 005c FFF7FEFF 		bl	maskstate
+ 188              	.LVL20:
+  97:simple.c      **** #ifdef __arm__ 
+  98:simple.c      ****     // clear stack and clear all other registers (leaving out r7)
+  99:simple.c      ****     // to remove any state held from previous runs
+ 100:simple.c      ****     asm volatile (
+ 189              		.loc 1 100 5 view .LVU48
+ 190              		.syntax divided
+ 191              	@ 100 "simple.c" 1
+ 192 0060 FFF7FEFF 		bl stack_clear
+ 193 0064 FFB4     	push {r0-r7}
+ 194 0066 201C     	movs r0, r4
+ 195 0068 0026     	mov r6, #0
+ 196 006a 0025     	mov r5, #0
+ 197 006c 0024     	mov r4, #0
+ 198 006e 0023     	mov r3, #0
+ 199 0070 0022     	mov r2, #0
+ 200 0072 0021     	mov r1, #0
+ 201 0074 FFF7FEFF 	bl aes128
+ 202 0078 FFBC     	pop {r0-r7}
+ 203              	
+ 204              	@ 0 "" 2
+ 101:simple.c      **** 
+ 102:simple.c      ****         "bl stack_clear\n"
+ 103:simple.c      ****         "push {r0-r7}\n"
+ 104:simple.c      ****         "movs r0, %[value]\n" 
+ 105:simple.c      ****         "mov r6, #0\n"
+ 106:simple.c      ****         "mov r5, #0\n"
+ 107:simple.c      ****         "mov r4, #0\n"
+ 108:simple.c      ****         "mov r3, #0\n"
+ 109:simple.c      ****         "mov r2, #0\n"
+ 110:simple.c      ****         "mov r1, #0\n"
+ 111:simple.c      ****         "bl aes128\n"
+ 112:simple.c      ****         "pop {r0-r7}\n"
+ 113:simple.c      ****         :
+ 114:simple.c      ****         : [value] "r" (output));
+ 115:simple.c      **** #else
+ 116:simple.c      ****     stack_clear();
+ 117:simple.c      ****     aes128(output);
+ 118:simple.c      **** #endif
+ 119:simple.c      ****     
+ 120:simple.c      ****     for(j=0;j<16;j++)
+ 205              		.loc 1 120 5 view .LVU49
+ 206              	.LVL21:
+ 207              		.loc 1 120 14 view .LVU50
+ 208              		.loc 1 120 10 is_stmt 0 view .LVU51
+ 209              		.thumb
+ 210              		.syntax unified
+ 211 007a 0025     		movs	r5, #0
+ 212              	.LVL22:
+ 213              	.L8:
+ 121:simple.c      ****     {
+ 122:simple.c      ****         printbyte(&output[j]);
+ 214              		.loc 1 122 9 is_stmt 1 discriminator 3 view .LVU52
+ 215 007c 6019     		adds	r0, r4, r5
+ 120:simple.c      ****     {
+ 216              		.loc 1 120 19 is_stmt 0 discriminator 3 view .LVU53
+ 217 007e 0135     		adds	r5, r5, #1
+ 218              	.LVL23:
+ 219              		.loc 1 122 9 discriminator 3 view .LVU54
+ 220 0080 FFF7FEFF 		bl	printbyte
+ 221              	.LVL24:
+ 120:simple.c      ****     {
+ 222              		.loc 1 120 19 is_stmt 1 discriminator 3 view .LVU55
+ 120:simple.c      ****     {
+ 223              		.loc 1 120 14 discriminator 3 view .LVU56
+ 224 0084 102D     		cmp	r5, #16
+ 225 0086 F9D1     		bne	.L8
+ 123:simple.c      ****     }
+ 124:simple.c      ****         
+ 125:simple.c      **** }
+ 226              		.loc 1 125 1 is_stmt 0 view .LVU57
+ 227              		@ sp needed
+ 228              	.LVL25:
+ 229              		.loc 1 125 1 view .LVU58
+ 230 0088 37BD     		pop	{r0, r1, r2, r4, r5, pc}
+ 231              	.L12:
+ 232 008a C046     		.align	2
+ 233              	.L11:
+ 234 008c 00000000 		.word	.LANCHOR0
+ 235              		.cfi_endproc
+ 236              	.LFE4:
+ 238              		.section	.text.simple_init,"ax",%progbits
+ 239              		.align	1
+ 240              		.global	simple_init
+ 241              		.syntax unified
+ 242              		.code	16
+ 243              		.thumb_func
+ 244              		.fpu softvfp
+ 246              	simple_init:
+ 247              	.LFB5:
+ 126:simple.c      **** 
+ 127:simple.c      **** 
+ 128:simple.c      **** #define RUN_FUNC(...) \
+ 129:simple.c      ****     run_byte_aes_masked(__VA_ARGS__)
+ 130:simple.c      **** 
+ 131:simple.c      **** //static const uint8_t fixedinput[16] =   {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x
+ 132:simple.c      **** static const uint8_t fixedkey[16] = {0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x12, 0x34, 0x
+ 133:simple.c      **** 
+ 134:simple.c      **** static const uint8_t fixedinput[16] = { /*@FIXED_INPUT{*/ 0xda, 0x39, 0xa3, 0xee, 0x5e, 0x6b, 0x4b,
+ 135:simple.c      **** 
+ 136:simple.c      **** 
+ 137:simple.c      **** void simple_init()
+ 138:simple.c      **** {
+ 248              		.loc 1 138 1 is_stmt 1 view -0
+ 249              		.cfi_startproc
+ 250              		@ args = 0, pretend = 0, frame = 0
+ 251              		@ frame_needed = 0, uses_anonymous_args = 0
+ 252              		@ link register save eliminated.
+ 139:simple.c      ****     int j=0;
+ 253              		.loc 1 139 5 view .LVU60
+ 254              	.LVL26:
+ 140:simple.c      ****     for(;j<16;j++)
+ 255              		.loc 1 140 5 view .LVU61
+ 256              		.loc 1 140 11 view .LVU62
+ 141:simple.c      ****     {
+ 142:simple.c      ****     }
+ 143:simple.c      **** }
+ 257              		.loc 1 143 1 is_stmt 0 view .LVU63
+ 258              		@ sp needed
+ 259 0000 7047     		bx	lr
+ 260              		.cfi_endproc
+ 261              	.LFE5:
+ 263              		.section	.text.simple_run,"ax",%progbits
+ 264              		.align	1
+ 265              		.global	simple_run
+ 266              		.syntax unified
+ 267              		.code	16
+ 268              		.thumb_func
+ 269              		.fpu softvfp
+ 271              	simple_run:
+ 272              	.LFB6:
+ 144:simple.c      **** 
+ 145:simple.c      **** 
+ 146:simple.c      **** void simple_run()
+ 147:simple.c      **** {
+ 273              		.loc 1 147 1 is_stmt 1 view -0
+ 274              		.cfi_startproc
+ 275              		@ args = 0, pretend = 0, frame = 0
+ 276              		@ frame_needed = 0, uses_anonymous_args = 0
+ 148:simple.c      **** 
+ 149:simple.c      ****     int i,j;
+ 277              		.loc 1 149 5 view .LVU65
+ 150:simple.c      **** 
+ 151:simple.c      ****     // Use fixed key and fixed input as specified by CRI for use with AES
+ 152:simple.c      ****     //static const uint8_t fixedkey[16] = {0xf3, 0x34, 0x15, 0x6e, 0x32, 0x11, 0x23, 0xff, 0x53, 0x
+ 153:simple.c      ****     //static const uint8_t fixedkey[16] = {0x11, 0x43, 0x4e, 0xdd, 0x55, 0xa6, 0xcc, 0xef, 0x10, 0x
+ 154:simple.c      **** 
+ 155:simple.c      **** /*
+ 156:simple.c      ****     for(i=0;i<NTRACES;i++)
+ 157:simple.c      ****     {
+ 158:simple.c      ****         
+ 159:simple.c      ****         if (i<TEST_TRACES)
+ 160:simple.c      ****         {
+ 161:simple.c      ****             for (j=0;j<16;j++)
+ 162:simple.c      ****             {
+ 163:simple.c      ****                 output[j] = 0x00;
+ 164:simple.c      ****                 readrandombyte(&randombuf[j]);
+ 165:simple.c      ****                 
+ 166:simple.c      ****                 readrandombyte(&randombuf[j]);
+ 167:simple.c      ****                 key[j] = fixedkey[j];
+ 168:simple.c      ****         
+ 169:simple.c      ****                 input[j] = fixedinput[j];
+ 170:simple.c      ****             }
+ 171:simple.c      ****         }
+ 172:simple.c      ****         else
+ 173:simple.c      ****         {
+ 174:simple.c      ****             for (j=0;j<16;j++)
+ 175:simple.c      ****             {
+ 176:simple.c      ****                
+ 177:simple.c      ****                 output[j] = 0x00;
+ 178:simple.c      ****                 readrandombyte(&key[j]);
+ 179:simple.c      ****                 
+ 180:simple.c      ****                 readrandombyte(&randombuf[j]);
+ 181:simple.c      ****                 
+ 182:simple.c      ****                 input[j] = randombuf[j];
+ 183:simple.c      ****             }
+ 184:simple.c      ****         }
+ 185:simple.c      ****         
+ 186:simple.c      ****         run_byte_aes_masked_(input, key);
+ 187:simple.c      **** 
+ 188:simple.c      ****     }
+ 189:simple.c      **** */
+ 190:simple.c      **** 
+ 191:simple.c      ****     
+ 192:simple.c      ****     for(i=0;i<NTRACES;i++)
+ 278              		.loc 1 192 5 view .LVU66
+ 279              	.LVL27:
+ 280              		.loc 1 192 14 view .LVU67
+ 147:simple.c      **** 
+ 281              		.loc 1 147 1 is_stmt 0 view .LVU68
+ 282 0000 F8B5     		push	{r3, r4, r5, r6, r7, lr}
+ 283              	.LCFI3:
+ 284              		.cfi_def_cfa_offset 24
+ 285              		.cfi_offset 3, -24
+ 286              		.cfi_offset 4, -20
+ 287              		.cfi_offset 5, -16
+ 288              		.cfi_offset 6, -12
+ 289              		.cfi_offset 7, -8
+ 290              		.cfi_offset 14, -4
+ 291              		.loc 1 192 10 view .LVU69
+ 292 0002 0026     		movs	r6, #0
+ 293 0004 1E4C     		ldr	r4, .L25
+ 294              	.LVL28:
+ 295              	.L17:
+ 193:simple.c      ****     {
+ 194:simple.c      ****         
+ 195:simple.c      ****         if (i<TEST_TRACES)
+ 296              		.loc 1 195 9 is_stmt 1 view .LVU70
+ 297              		.loc 1 195 12 is_stmt 0 view .LVU71
+ 298 0006 1F4B     		ldr	r3, .L25+4
+ 196:simple.c      ****         {
+ 197:simple.c      ****             for (j=0;j<16;j++)
+ 299              		.loc 1 197 19 view .LVU72
+ 300 0008 0025     		movs	r5, #0
+ 195:simple.c      ****         {
+ 301              		.loc 1 195 12 view .LVU73
+ 302 000a 9E42     		cmp	r6, r3
+ 303 000c 20DC     		bgt	.L15
+ 304              	.LVL29:
+ 305              	.L16:
+ 306              	.LBB2:
+ 198:simple.c      ****             {
+ 199:simple.c      ****                
+ 200:simple.c      ****                 output[j] = 0x00;
+ 307              		.loc 1 200 17 is_stmt 1 discriminator 3 view .LVU74
+ 201:simple.c      ****                 readrandombyte(&key[j]);
+ 308              		.loc 1 201 17 is_stmt 0 discriminator 3 view .LVU75
+ 309 000e 2000     		movs	r0, r4
+ 200:simple.c      ****                 readrandombyte(&key[j]);
+ 310              		.loc 1 200 27 discriminator 3 view .LVU76
+ 311 0010 0023     		movs	r3, #0
+ 312              		.loc 1 201 17 discriminator 3 view .LVU77
+ 313 0012 1030     		adds	r0, r0, #16
+ 200:simple.c      ****                 readrandombyte(&key[j]);
+ 314              		.loc 1 200 27 discriminator 3 view .LVU78
+ 315 0014 6355     		strb	r3, [r4, r5]
+ 316              		.loc 1 201 17 is_stmt 1 discriminator 3 view .LVU79
+ 317 0016 4019     		adds	r0, r0, r5
+ 318 0018 FFF7FEFF 		bl	readrandombyte
+ 319              	.LVL30:
+ 202:simple.c      ****                 
+ 203:simple.c      ****                 readrandombyte(&randombuf[j]);
+ 320              		.loc 1 203 17 discriminator 3 view .LVU80
+ 321 001c 2000     		movs	r0, r4
+ 322 001e 2030     		adds	r0, r0, #32
+ 323 0020 4019     		adds	r0, r0, r5
+ 324 0022 FFF7FEFF 		bl	readrandombyte
+ 325              	.LVL31:
+ 204:simple.c      ****                 
+ 205:simple.c      ****                 input[j] = randombuf[j];
+ 326              		.loc 1 205 17 discriminator 3 view .LVU81
+ 327              		.loc 1 205 37 is_stmt 0 discriminator 3 view .LVU82
+ 328 0026 631C     		adds	r3, r4, #1
+ 329 0028 5B19     		adds	r3, r3, r5
+ 330 002a DB7F     		ldrb	r3, [r3, #31]
+ 331              		.loc 1 205 26 discriminator 3 view .LVU83
+ 332 002c 164A     		ldr	r2, .L25+8
+ 333              		.loc 1 205 37 discriminator 3 view .LVU84
+ 334 002e DBB2     		uxtb	r3, r3
+ 335              		.loc 1 205 26 discriminator 3 view .LVU85
+ 336 0030 5355     		strb	r3, [r2, r5]
+ 337              	.LBE2:
+ 197:simple.c      ****             {
+ 338              		.loc 1 197 28 is_stmt 1 discriminator 3 view .LVU86
+ 339 0032 0135     		adds	r5, r5, #1
+ 340              	.LVL32:
+ 197:simple.c      ****             {
+ 341              		.loc 1 197 23 discriminator 3 view .LVU87
+ 342 0034 102D     		cmp	r5, #16
+ 343 0036 EAD1     		bne	.L16
+ 344              	.L19:
+ 206:simple.c      ****             }
+ 207:simple.c      ****         }
+ 208:simple.c      ****         else
+ 209:simple.c      ****         {
+ 210:simple.c      ****             for (j=0;j<16;j++)
+ 211:simple.c      ****             {
+ 212:simple.c      ****                 
+ 213:simple.c      ****                 output[j] = 0x00;
+ 214:simple.c      ****                 readrandombyte(&randombuf[j]);
+ 215:simple.c      ****                 
+ 216:simple.c      ****                 readrandombyte(&randombuf[j]);
+ 217:simple.c      ****                 key[j] = fixedkey[j];
+ 218:simple.c      ****         
+ 219:simple.c      ****                 input[j] = fixedinput[j];
+ 220:simple.c      ****             }
+ 221:simple.c      ****         }
+ 222:simple.c      ****         
+ 223:simple.c      ****         run_byte_aes_masked_(input, key);
+ 345              		.loc 1 223 9 view .LVU88
+ 346 0038 2100     		movs	r1, r4
+ 347 003a 1348     		ldr	r0, .L25+8
+ 348 003c 1031     		adds	r1, r1, #16
+ 349 003e FFF7FEFF 		bl	run_byte_aes_masked_
+ 350              	.LVL33:
+ 192:simple.c      ****     {
+ 351              		.loc 1 192 24 view .LVU89
+ 192:simple.c      ****     {
+ 352              		.loc 1 192 14 is_stmt 0 view .LVU90
+ 353 0042 124B     		ldr	r3, .L25+12
+ 192:simple.c      ****     {
+ 354              		.loc 1 192 24 view .LVU91
+ 355 0044 0136     		adds	r6, r6, #1
+ 356              	.LVL34:
+ 192:simple.c      ****     {
+ 357              		.loc 1 192 14 is_stmt 1 view .LVU92
+ 358 0046 9E42     		cmp	r6, r3
+ 359 0048 DDD1     		bne	.L17
+ 224:simple.c      **** 
+ 225:simple.c      ****     }
+ 226:simple.c      **** 
+ 227:simple.c      **** 
+ 228:simple.c      ****     endprogram();
+ 360              		.loc 1 228 5 view .LVU93
+ 361 004a FFF7FEFF 		bl	endprogram
+ 362              	.LVL35:
+ 229:simple.c      **** 
+ 230:simple.c      **** }
+ 363              		.loc 1 230 1 is_stmt 0 view .LVU94
+ 364              		@ sp needed
+ 365              	.LVL36:
+ 366              	.LVL37:
+ 367              		.loc 1 230 1 view .LVU95
+ 368 004e F8BD     		pop	{r3, r4, r5, r6, r7, pc}
+ 369              	.LVL38:
+ 370              	.L15:
+ 371              	.LBB3:
+ 213:simple.c      ****                 readrandombyte(&randombuf[j]);
+ 372              		.loc 1 213 17 is_stmt 1 discriminator 3 view .LVU96
+ 373 0050 2700     		movs	r7, r4
+ 213:simple.c      ****                 readrandombyte(&randombuf[j]);
+ 374              		.loc 1 213 27 is_stmt 0 discriminator 3 view .LVU97
+ 375 0052 0023     		movs	r3, #0
+ 376 0054 2037     		adds	r7, r7, #32
+ 377 0056 7F19     		adds	r7, r7, r5
+ 378 0058 6355     		strb	r3, [r4, r5]
+ 214:simple.c      ****                 
+ 379              		.loc 1 214 17 is_stmt 1 discriminator 3 view .LVU98
+ 380 005a 3800     		movs	r0, r7
+ 381 005c FFF7FEFF 		bl	readrandombyte
+ 382              	.LVL39:
+ 216:simple.c      ****                 key[j] = fixedkey[j];
+ 383              		.loc 1 216 17 discriminator 3 view .LVU99
+ 384 0060 3800     		movs	r0, r7
+ 385 0062 FFF7FEFF 		bl	readrandombyte
+ 386              	.LVL40:
+ 217:simple.c      ****         
+ 387              		.loc 1 217 17 discriminator 3 view .LVU100
+ 217:simple.c      ****         
+ 388              		.loc 1 217 34 is_stmt 0 discriminator 3 view .LVU101
+ 389 0066 0A4B     		ldr	r3, .L25+16
+ 217:simple.c      ****         
+ 390              		.loc 1 217 24 discriminator 3 view .LVU102
+ 391 0068 6219     		adds	r2, r4, r5
+ 217:simple.c      ****         
+ 392              		.loc 1 217 34 discriminator 3 view .LVU103
+ 393 006a E95C     		ldrb	r1, [r5, r3]
+ 219:simple.c      ****             }
+ 394              		.loc 1 219 38 discriminator 3 view .LVU104
+ 395 006c 1033     		adds	r3, r3, #16
+ 396 006e EB5C     		ldrb	r3, [r5, r3]
+ 217:simple.c      ****         
+ 397              		.loc 1 217 24 discriminator 3 view .LVU105
+ 398 0070 1174     		strb	r1, [r2, #16]
+ 219:simple.c      ****             }
+ 399              		.loc 1 219 17 is_stmt 1 discriminator 3 view .LVU106
+ 219:simple.c      ****             }
+ 400              		.loc 1 219 26 is_stmt 0 discriminator 3 view .LVU107
+ 401 0072 054A     		ldr	r2, .L25+8
+ 402 0074 5355     		strb	r3, [r2, r5]
+ 403              	.LBE3:
+ 210:simple.c      ****             {
+ 404              		.loc 1 210 28 is_stmt 1 discriminator 3 view .LVU108
+ 405 0076 0135     		adds	r5, r5, #1
+ 406              	.LVL41:
+ 210:simple.c      ****             {
+ 407              		.loc 1 210 23 discriminator 3 view .LVU109
+ 408 0078 102D     		cmp	r5, #16
+ 409 007a E9D1     		bne	.L15
+ 410 007c DCE7     		b	.L19
+ 411              	.L26:
+ 412 007e C046     		.align	2
+ 413              	.L25:
+ 414 0080 00000000 		.word	.LANCHOR0
+ 415 0084 0F270000 		.word	9999
+ 416 0088 30000000 		.word	.LANCHOR0+48
+ 417 008c 204E0000 		.word	20000
+ 418 0090 00000000 		.word	.LANCHOR1
+ 419              		.cfi_endproc
+ 420              	.LFE6:
+ 422              		.global	domask
+ 423              		.global	rk
+ 424              		.global	throwaway
+ 425              		.global	key
+ 426              		.global	randombuf
+ 427              		.global	output
+ 428              		.global	input
+ 429              		.global	input_copy
+ 430              		.section	.rodata
+ 431              		.set	.LANCHOR1,. + 0
+ 434              	fixedkey:
+ 435 0000 01234567 		.ascii	"\001#Eg\211\253\315\357\0224Vx\232\274\336\360"
+ 435      89ABCDEF 
+ 435      12345678 
+ 435      9ABCDEF0 
+ 438              	fixedinput:
+ 439 0010 DA39A3EE 		.ascii	"\3329\243\356^kK\0152U\277\357\225`\030\220"
+ 439      5E6B4B0D 
+ 439      3255BFEF 
+ 439      95601890 
+ 440              		.data
+ 441              		.align	2
+ 444              	domask:
+ 445 0000 01000000 		.word	1
+ 446              		.bss
+ 447              		.align	2
+ 448              		.set	.LANCHOR0,. + 0
+ 451              	output:
+ 452 0000 00000000 		.space	16
+ 452      00000000 
+ 452      00000000 
+ 452      00000000 
+ 455              	key:
+ 456 0010 00000000 		.space	16
+ 456      00000000 
+ 456      00000000 
+ 456      00000000 
+ 459              	randombuf:
+ 460 0020 00000000 		.space	16
+ 460      00000000 
+ 460      00000000 
+ 460      00000000 
+ 463              	input:
+ 464 0030 00000000 		.space	16
+ 464      00000000 
+ 464      00000000 
+ 464      00000000 
+ 467              	rk:
+ 468 0040 00000000 		.space	176
+ 468      00000000 
+ 468      00000000 
+ 468      00000000 
+ 468      00000000 
+ 471              	throwaway:
+ 472 00f0 00000000 		.space	16
+ 472      00000000 
+ 472      00000000 
+ 472      00000000 
+ 475              	input_copy:
+ 476 0100 00000000 		.space	16
+ 476      00000000 
+ 476      00000000 
+ 476      00000000 
+ 477              		.text
+ 478              	.Letext0:
+ 479              		.file 2 "/usr/arm-none-eabi/include/machine/_default_types.h"
+ 480              		.file 3 "/usr/arm-none-eabi/include/sys/_stdint.h"
+ 481              		.file 4 "elmoasmfunctionsdef.h"
+ 482              		.file 5 "byte_mask_aes.h"
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 simple.c
+     /tmp/cc8qwnuR.s:16     .text.stack_clear:0000000000000000 $t
+     /tmp/cc8qwnuR.s:24     .text.stack_clear:0000000000000000 stack_clear
+     /tmp/cc8qwnuR.s:77     .text.stack_clear:0000000000000020 $d
+     /tmp/cc8qwnuR.s:83     .text.run_byte_aes_masked_:0000000000000000 $t
+     /tmp/cc8qwnuR.s:90     .text.run_byte_aes_masked_:0000000000000000 run_byte_aes_masked_
+     /tmp/cc8qwnuR.s:234    .text.run_byte_aes_masked_:000000000000008c $d
+     /tmp/cc8qwnuR.s:239    .text.simple_init:0000000000000000 $t
+     /tmp/cc8qwnuR.s:246    .text.simple_init:0000000000000000 simple_init
+     /tmp/cc8qwnuR.s:264    .text.simple_run:0000000000000000 $t
+     /tmp/cc8qwnuR.s:271    .text.simple_run:0000000000000000 simple_run
+     /tmp/cc8qwnuR.s:414    .text.simple_run:0000000000000080 $d
+     /tmp/cc8qwnuR.s:444    .data:0000000000000000 domask
+     /tmp/cc8qwnuR.s:467    .bss:0000000000000040 rk
+     /tmp/cc8qwnuR.s:471    .bss:00000000000000f0 throwaway
+     /tmp/cc8qwnuR.s:455    .bss:0000000000000010 key
+     /tmp/cc8qwnuR.s:459    .bss:0000000000000020 randombuf
+     /tmp/cc8qwnuR.s:451    .bss:0000000000000000 output
+     /tmp/cc8qwnuR.s:463    .bss:0000000000000030 input
+     /tmp/cc8qwnuR.s:475    .bss:0000000000000100 input_copy
+     /tmp/cc8qwnuR.s:434    .rodata:0000000000000000 fixedkey
+     /tmp/cc8qwnuR.s:438    .rodata:0000000000000010 fixedinput
+     /tmp/cc8qwnuR.s:441    .data:0000000000000000 $d
+     /tmp/cc8qwnuR.s:447    .bss:0000000000000000 $d
+
+UNDEFINED SYMBOLS
+readrandombyte
+runrand
+KeyExpansion
+randomize_mask
+init_masking
+maskstate
+aes128
+printbyte
+endprogram

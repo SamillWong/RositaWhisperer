@@ -1,0 +1,411 @@
+   1              		.cpu cortex-m0
+   2              		.eabi_attribute 20, 1
+   3              		.eabi_attribute 21, 1
+   4              		.eabi_attribute 23, 3
+   5              		.eabi_attribute 24, 1
+   6              		.eabi_attribute 25, 1
+   7              		.eabi_attribute 26, 1
+   8              		.eabi_attribute 30, 6
+   9              		.eabi_attribute 34, 0
+  10              		.eabi_attribute 18, 4
+  11              		.file	"ldr-state.c"
+  12              		.text
+  13              	.Ltext0:
+  14              		.cfi_sections	.debug_frame
+  15              		.global	SEED
+  16              		.bss
+  17              		.align	2
+  20              	SEED:
+  21 0000 00000000 		.space	32
+  21      00000000 
+  21      00000000 
+  21      00000000 
+  21      00000000 
+  22              		.global	BASE
+  23              		.align	2
+  26              	BASE:
+  27 0020 00000000 		.space	32
+  27      00000000 
+  27      00000000 
+  27      00000000 
+  27      00000000 
+  28              		.global	SBASE
+  29              		.align	2
+  32              	SBASE:
+  33 0040 00000000 		.space	32
+  33      00000000 
+  33      00000000 
+  33      00000000 
+  33      00000000 
+  34              		.global	R
+  35              		.align	2
+  38              	R:
+  39 0060 00000000 		.space	4
+  40              		.section	.text.init_seed,"ax",%progbits
+  41              		.align	1
+  42              		.global	init_seed
+  43              		.arch armv6s-m
+  44              		.syntax unified
+  45              		.code	16
+  46              		.thumb_func
+  47              		.fpu softvfp
+  49              	init_seed:
+  50              	.LFB0:
+  51              		.file 1 "ldr-state.c"
+   1:ldr-state.c   **** /* Copyright 2021 University of Adelaide
+   2:ldr-state.c   ****  *
+   3:ldr-state.c   ****  * Licensed under the Apache License, Version 2.0 (the "License");
+   4:ldr-state.c   ****  * you may not use this file except in compliance with the License.
+   5:ldr-state.c   ****  * You may obtain a copy of the License at
+   6:ldr-state.c   ****  * 
+   7:ldr-state.c   ****  *    http://www.apache.org/licenses/LICENSE-2.0
+   8:ldr-state.c   ****  * 
+   9:ldr-state.c   ****  * Unless required by applicable law or agreed to in writing, software
+  10:ldr-state.c   ****  * distributed under the License is distributed on an "AS IS" BASIS,
+  11:ldr-state.c   ****  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  12:ldr-state.c   ****  * See the License for the specific language governing permissions and
+  13:ldr-state.c   ****  * limitations under the License.
+  14:ldr-state.c   ****  */
+  15:ldr-state.c   **** 
+  16:ldr-state.c   **** #include "hal.h"
+  17:ldr-state.c   **** #include "simpleserial.h"
+  18:ldr-state.c   **** #define N_BASE 32
+  19:ldr-state.c   **** 
+  20:ldr-state.c   **** unsigned char SEED[N_BASE] = {0};
+  21:ldr-state.c   **** unsigned char BASE[N_BASE] = {0};
+  22:ldr-state.c   **** unsigned char SBASE[N_BASE] = {0};
+  23:ldr-state.c   **** unsigned int R = 0;
+  24:ldr-state.c   **** extern void run_calib(unsigned char*, unsigned char*, unsigned int*);
+  25:ldr-state.c   **** 
+  26:ldr-state.c   **** void init_seed(void)
+  27:ldr-state.c   **** {
+  52              		.loc 1 27 1
+  53              		.cfi_startproc
+  54              		@ args = 0, pretend = 0, frame = 8
+  55              		@ frame_needed = 1, uses_anonymous_args = 0
+  56 0000 80B5     		push	{r7, lr}
+  57              	.LCFI0:
+  58              		.cfi_def_cfa_offset 8
+  59              		.cfi_offset 7, -8
+  60              		.cfi_offset 14, -4
+  61 0002 82B0     		sub	sp, sp, #8
+  62              	.LCFI1:
+  63              		.cfi_def_cfa_offset 16
+  64 0004 00AF     		add	r7, sp, #0
+  65              	.LCFI2:
+  66              		.cfi_def_cfa_register 7
+  67              	.LBB2:
+  28:ldr-state.c   ****     for (int i = 0; i < N_BASE; i++)
+  68              		.loc 1 28 14
+  69 0006 0023     		movs	r3, #0
+  70 0008 7B60     		str	r3, [r7, #4]
+  71              		.loc 1 28 5
+  72 000a 0BE0     		b	.L2
+  73              	.L3:
+  29:ldr-state.c   ****     {
+  30:ldr-state.c   **** 	    SEED[i] = BASE[i];
+  74              		.loc 1 30 20 discriminator 3
+  75 000c 094A     		ldr	r2, .L4
+  76 000e 7B68     		ldr	r3, [r7, #4]
+  77 0010 D318     		adds	r3, r2, r3
+  78 0012 1978     		ldrb	r1, [r3]
+  79              		.loc 1 30 14 discriminator 3
+  80 0014 084A     		ldr	r2, .L4+4
+  81 0016 7B68     		ldr	r3, [r7, #4]
+  82 0018 D318     		adds	r3, r2, r3
+  83 001a 0A1C     		adds	r2, r1, #0
+  84 001c 1A70     		strb	r2, [r3]
+  28:ldr-state.c   ****     for (int i = 0; i < N_BASE; i++)
+  85              		.loc 1 28 34 discriminator 3
+  86 001e 7B68     		ldr	r3, [r7, #4]
+  87 0020 0133     		adds	r3, r3, #1
+  88 0022 7B60     		str	r3, [r7, #4]
+  89              	.L2:
+  28:ldr-state.c   ****     for (int i = 0; i < N_BASE; i++)
+  90              		.loc 1 28 23 discriminator 1
+  91 0024 7B68     		ldr	r3, [r7, #4]
+  92 0026 1F2B     		cmp	r3, #31
+  93 0028 F0DD     		ble	.L3
+  94              	.LBE2:
+  31:ldr-state.c   ****     }
+  32:ldr-state.c   **** }
+  95              		.loc 1 32 1
+  96 002a C046     		nop
+  97 002c C046     		nop
+  98 002e BD46     		mov	sp, r7
+  99 0030 02B0     		add	sp, sp, #8
+ 100              		@ sp needed
+ 101 0032 80BD     		pop	{r7, pc}
+ 102              	.L5:
+ 103              		.align	2
+ 104              	.L4:
+ 105 0034 00000000 		.word	BASE
+ 106 0038 00000000 		.word	SEED
+ 107              		.cfi_endproc
+ 108              	.LFE0:
+ 110              		.section	.text.incr_base,"ax",%progbits
+ 111              		.align	1
+ 112              		.global	incr_base
+ 113              		.syntax unified
+ 114              		.code	16
+ 115              		.thumb_func
+ 116              		.fpu softvfp
+ 118              	incr_base:
+ 119              	.LFB1:
+  33:ldr-state.c   **** 
+  34:ldr-state.c   **** void incr_base(void)
+  35:ldr-state.c   **** {
+ 120              		.loc 1 35 1
+ 121              		.cfi_startproc
+ 122              		@ args = 0, pretend = 0, frame = 8
+ 123              		@ frame_needed = 1, uses_anonymous_args = 0
+ 124 0000 80B5     		push	{r7, lr}
+ 125              	.LCFI3:
+ 126              		.cfi_def_cfa_offset 8
+ 127              		.cfi_offset 7, -8
+ 128              		.cfi_offset 14, -4
+ 129 0002 82B0     		sub	sp, sp, #8
+ 130              	.LCFI4:
+ 131              		.cfi_def_cfa_offset 16
+ 132 0004 00AF     		add	r7, sp, #0
+ 133              	.LCFI5:
+ 134              		.cfi_def_cfa_register 7
+ 135              	.LBB3:
+  36:ldr-state.c   ****     for (int i = 0; i < N_BASE; i++)
+ 136              		.loc 1 36 14
+ 137 0006 0023     		movs	r3, #0
+ 138 0008 7B60     		str	r3, [r7, #4]
+ 139              		.loc 1 36 5
+ 140 000a 1BE0     		b	.L7
+ 141              	.L8:
+  37:ldr-state.c   ****     {
+  38:ldr-state.c   ****     	SEED[i] = 1103515245 * SEED[i] + 12345;
+ 142              		.loc 1 38 33 discriminator 3
+ 143 000c 114A     		ldr	r2, .L9
+ 144 000e 7B68     		ldr	r3, [r7, #4]
+ 145 0010 D318     		adds	r3, r2, r3
+ 146 0012 1B78     		ldrb	r3, [r3]
+ 147              		.loc 1 38 37 discriminator 3
+ 148 0014 6D22     		movs	r2, #109
+ 149 0016 5343     		muls	r3, r2
+ 150 0018 DBB2     		uxtb	r3, r3
+ 151 001a 3933     		adds	r3, r3, #57
+ 152 001c D9B2     		uxtb	r1, r3
+ 153              		.loc 1 38 14 discriminator 3
+ 154 001e 0D4A     		ldr	r2, .L9
+ 155 0020 7B68     		ldr	r3, [r7, #4]
+ 156 0022 D318     		adds	r3, r2, r3
+ 157 0024 0A1C     		adds	r2, r1, #0
+ 158 0026 1A70     		strb	r2, [r3]
+  39:ldr-state.c   ****     	BASE[i] = SEED[i] >> 24;
+ 159              		.loc 1 39 20 discriminator 3
+ 160 0028 0A4A     		ldr	r2, .L9
+ 161 002a 7B68     		ldr	r3, [r7, #4]
+ 162 002c D318     		adds	r3, r2, r3
+ 163 002e 1B78     		ldrb	r3, [r3]
+ 164              		.loc 1 39 24 discriminator 3
+ 165 0030 1B16     		asrs	r3, r3, #24
+ 166              		.loc 1 39 14 discriminator 3
+ 167 0032 D9B2     		uxtb	r1, r3
+ 168 0034 084A     		ldr	r2, .L9+4
+ 169 0036 7B68     		ldr	r3, [r7, #4]
+ 170 0038 D318     		adds	r3, r2, r3
+ 171 003a 0A1C     		adds	r2, r1, #0
+ 172 003c 1A70     		strb	r2, [r3]
+  36:ldr-state.c   ****     for (int i = 0; i < N_BASE; i++)
+ 173              		.loc 1 36 34 discriminator 3
+ 174 003e 7B68     		ldr	r3, [r7, #4]
+ 175 0040 0133     		adds	r3, r3, #1
+ 176 0042 7B60     		str	r3, [r7, #4]
+ 177              	.L7:
+  36:ldr-state.c   ****     for (int i = 0; i < N_BASE; i++)
+ 178              		.loc 1 36 23 discriminator 1
+ 179 0044 7B68     		ldr	r3, [r7, #4]
+ 180 0046 1F2B     		cmp	r3, #31
+ 181 0048 E0DD     		ble	.L8
+ 182              	.LBE3:
+  40:ldr-state.c   ****     }
+  41:ldr-state.c   **** }
+ 183              		.loc 1 41 1
+ 184 004a C046     		nop
+ 185 004c C046     		nop
+ 186 004e BD46     		mov	sp, r7
+ 187 0050 02B0     		add	sp, sp, #8
+ 188              		@ sp needed
+ 189 0052 80BD     		pop	{r7, pc}
+ 190              	.L10:
+ 191              		.align	2
+ 192              	.L9:
+ 193 0054 00000000 		.word	SEED
+ 194 0058 00000000 		.word	BASE
+ 195              		.cfi_endproc
+ 196              	.LFE1:
+ 198              		.section	.text.get_pt,"ax",%progbits
+ 199              		.align	1
+ 200              		.global	get_pt
+ 201              		.syntax unified
+ 202              		.code	16
+ 203              		.thumb_func
+ 204              		.fpu softvfp
+ 206              	get_pt:
+ 207              	.LFB2:
+  42:ldr-state.c   **** 
+  43:ldr-state.c   **** void get_pt(uint8_t* pt, uint8_t len)
+  44:ldr-state.c   **** {
+ 208              		.loc 1 44 1
+ 209              		.cfi_startproc
+ 210              		@ args = 0, pretend = 0, frame = 16
+ 211              		@ frame_needed = 1, uses_anonymous_args = 0
+ 212 0000 80B5     		push	{r7, lr}
+ 213              	.LCFI6:
+ 214              		.cfi_def_cfa_offset 8
+ 215              		.cfi_offset 7, -8
+ 216              		.cfi_offset 14, -4
+ 217 0002 84B0     		sub	sp, sp, #16
+ 218              	.LCFI7:
+ 219              		.cfi_def_cfa_offset 24
+ 220 0004 00AF     		add	r7, sp, #0
+ 221              	.LCFI8:
+ 222              		.cfi_def_cfa_register 7
+ 223 0006 7860     		str	r0, [r7, #4]
+ 224 0008 0A00     		movs	r2, r1
+ 225 000a FB1C     		adds	r3, r7, #3
+ 226 000c 1A70     		strb	r2, [r3]
+  45:ldr-state.c   ****     init_seed();
+ 227              		.loc 1 45 5
+ 228 000e FFF7FEFF 		bl	init_seed
+  46:ldr-state.c   ****     incr_base();
+ 229              		.loc 1 46 5
+ 230 0012 FFF7FEFF 		bl	incr_base
+  47:ldr-state.c   ****     run_calib(BASE, SBASE, &R);
+ 231              		.loc 1 47 5
+ 232 0016 0A4A     		ldr	r2, .L14
+ 233 0018 0A49     		ldr	r1, .L14+4
+ 234 001a 0B4B     		ldr	r3, .L14+8
+ 235 001c 1800     		movs	r0, r3
+ 236 001e FFF7FEFF 		bl	run_calib
+ 237              	.LBB4:
+  48:ldr-state.c   ****     for (volatile int i = 0; i < 100; i++) {}
+ 238              		.loc 1 48 23
+ 239 0022 0023     		movs	r3, #0
+ 240 0024 FB60     		str	r3, [r7, #12]
+ 241              		.loc 1 48 5
+ 242 0026 02E0     		b	.L12
+ 243              	.L13:
+ 244              		.loc 1 48 40 discriminator 3
+ 245 0028 FB68     		ldr	r3, [r7, #12]
+ 246 002a 0133     		adds	r3, r3, #1
+ 247 002c FB60     		str	r3, [r7, #12]
+ 248              	.L12:
+ 249              		.loc 1 48 32 discriminator 1
+ 250 002e FB68     		ldr	r3, [r7, #12]
+ 251 0030 632B     		cmp	r3, #99
+ 252 0032 F9DD     		ble	.L13
+ 253              	.LBE4:
+  49:ldr-state.c   **** }
+ 254              		.loc 1 49 1
+ 255 0034 C046     		nop
+ 256 0036 C046     		nop
+ 257 0038 BD46     		mov	sp, r7
+ 258 003a 04B0     		add	sp, sp, #16
+ 259              		@ sp needed
+ 260 003c 80BD     		pop	{r7, pc}
+ 261              	.L15:
+ 262 003e C046     		.align	2
+ 263              	.L14:
+ 264 0040 00000000 		.word	R
+ 265 0044 00000000 		.word	SBASE
+ 266 0048 00000000 		.word	BASE
+ 267              		.cfi_endproc
+ 268              	.LFE2:
+ 270              		.section	.text.main,"ax",%progbits
+ 271              		.align	1
+ 272              		.global	main
+ 273              		.syntax unified
+ 274              		.code	16
+ 275              		.thumb_func
+ 276              		.fpu softvfp
+ 278              	main:
+ 279              	.LFB3:
+  50:ldr-state.c   **** 
+  51:ldr-state.c   **** int main(void)
+  52:ldr-state.c   **** {
+ 280              		.loc 1 52 1
+ 281              		.cfi_startproc
+ 282              		@ args = 0, pretend = 0, frame = 0
+ 283              		@ frame_needed = 1, uses_anonymous_args = 0
+ 284 0000 80B5     		push	{r7, lr}
+ 285              	.LCFI9:
+ 286              		.cfi_def_cfa_offset 8
+ 287              		.cfi_offset 7, -8
+ 288              		.cfi_offset 14, -4
+ 289 0002 00AF     		add	r7, sp, #0
+ 290              	.LCFI10:
+ 291              		.cfi_def_cfa_register 7
+  53:ldr-state.c   ****     platform_init();
+ 292              		.loc 1 53 5
+ 293 0004 FFF7FEFF 		bl	platform_init
+  54:ldr-state.c   ****     init_uart();
+ 294              		.loc 1 54 5
+ 295 0008 FFF7FEFF 		bl	init_uart
+  55:ldr-state.c   ****     trigger_setup();
+ 296              		.loc 1 55 5
+ 297 000c FFF7FEFF 		bl	trigger_setup
+  56:ldr-state.c   **** 	simpleserial_init();
+ 298              		.loc 1 56 2
+ 299 0010 FFF7FEFF 		bl	simpleserial_init
+  57:ldr-state.c   ****     simpleserial_addcmd('p', 16, get_pt);
+ 300              		.loc 1 57 5
+ 301 0014 044B     		ldr	r3, .L18
+ 302 0016 1A00     		movs	r2, r3
+ 303 0018 1021     		movs	r1, #16
+ 304 001a 7020     		movs	r0, #112
+ 305 001c FFF7FEFF 		bl	simpleserial_addcmd
+ 306              	.L17:
+  58:ldr-state.c   ****     
+  59:ldr-state.c   ****     while(1)
+  60:ldr-state.c   ****         simpleserial_get();
+ 307              		.loc 1 60 9 discriminator 1
+ 308 0020 FFF7FEFF 		bl	simpleserial_get
+ 309 0024 FCE7     		b	.L17
+ 310              	.L19:
+ 311 0026 C046     		.align	2
+ 312              	.L18:
+ 313 0028 00000000 		.word	get_pt
+ 314              		.cfi_endproc
+ 315              	.LFE3:
+ 317              		.text
+ 318              	.Letext0:
+ 319              		.file 2 "/usr/arm-none-eabi/include/machine/_default_types.h"
+ 320              		.file 3 "/usr/arm-none-eabi/include/sys/_stdint.h"
+ 321              		.file 4 ".././simpleserial/simpleserial.h"
+ 322              		.file 5 ".././hal/stm32f0/stm32f0_hal.h"
+ 323              		.file 6 ".././hal/hal.h"
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 ldr-state.c
+     /tmp/ccqkhDKg.s:20     .bss:0000000000000000 SEED
+     /tmp/ccqkhDKg.s:17     .bss:0000000000000000 $d
+     /tmp/ccqkhDKg.s:26     .bss:0000000000000020 BASE
+     /tmp/ccqkhDKg.s:32     .bss:0000000000000040 SBASE
+     /tmp/ccqkhDKg.s:38     .bss:0000000000000060 R
+     /tmp/ccqkhDKg.s:41     .text.init_seed:0000000000000000 $t
+     /tmp/ccqkhDKg.s:49     .text.init_seed:0000000000000000 init_seed
+     /tmp/ccqkhDKg.s:105    .text.init_seed:0000000000000034 $d
+     /tmp/ccqkhDKg.s:111    .text.incr_base:0000000000000000 $t
+     /tmp/ccqkhDKg.s:118    .text.incr_base:0000000000000000 incr_base
+     /tmp/ccqkhDKg.s:193    .text.incr_base:0000000000000054 $d
+     /tmp/ccqkhDKg.s:199    .text.get_pt:0000000000000000 $t
+     /tmp/ccqkhDKg.s:206    .text.get_pt:0000000000000000 get_pt
+     /tmp/ccqkhDKg.s:264    .text.get_pt:0000000000000040 $d
+     /tmp/ccqkhDKg.s:271    .text.main:0000000000000000 $t
+     /tmp/ccqkhDKg.s:278    .text.main:0000000000000000 main
+     /tmp/ccqkhDKg.s:313    .text.main:0000000000000028 $d
+
+UNDEFINED SYMBOLS
+run_calib
+platform_init
+init_uart
+trigger_setup
+simpleserial_init
+simpleserial_addcmd
+simpleserial_get

@@ -1,0 +1,112 @@
+   1              		.cpu cortex-m0
+   2              		.eabi_attribute 20, 1
+   3              		.eabi_attribute 21, 1
+   4              		.eabi_attribute 23, 3
+   5              		.eabi_attribute 24, 1
+   6              		.eabi_attribute 25, 1
+   7              		.eabi_attribute 26, 1
+   8              		.eabi_attribute 30, 4
+   9              		.eabi_attribute 34, 0
+  10              		.eabi_attribute 18, 4
+  11              		.file	"main.c"
+  12              		.text
+  13              	.Ltext0:
+  14              		.cfi_sections	.debug_frame
+  15              		.section	.text.startup.main,"ax",%progbits
+  16              		.align	1
+  17              		.global	main
+  18              		.arch armv6s-m
+  19              		.syntax unified
+  20              		.code	16
+  21              		.thumb_func
+  22              		.fpu softvfp
+  24              	main:
+  25              	.LFB0:
+  26              		.file 1 "main.c"
+   1:main.c        **** /* Copyright 2020 University of Adelaide
+   2:main.c        ****  *
+   3:main.c        ****  * Licensed under the Apache License, Version 2.0 (the "License");
+   4:main.c        ****  * you may not use this file except in compliance with the License.
+   5:main.c        ****  * You may obtain a copy of the License at
+   6:main.c        ****  * 
+   7:main.c        ****  *    http://www.apache.org/licenses/LICENSE-2.0
+   8:main.c        ****  * 
+   9:main.c        ****  * Unless required by applicable law or agreed to in writing, software
+  10:main.c        ****  * distributed under the License is distributed on an "AS IS" BASIS,
+  11:main.c        ****  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  12:main.c        ****  * See the License for the specific language governing permissions and
+  13:main.c        ****  * limitations under the License.
+  14:main.c        ****  */
+  15:main.c        **** 
+  16:main.c        **** #include "hal.h"
+  17:main.c        **** 
+  18:main.c        **** void simple_init();
+  19:main.c        **** void simple_run();
+  20:main.c        **** 
+  21:main.c        **** int main(void)
+  22:main.c        **** {
+  27              		.loc 1 22 1 view -0
+  28              		.cfi_startproc
+  29              		@ args = 0, pretend = 0, frame = 0
+  30              		@ frame_needed = 0, uses_anonymous_args = 0
+  23:main.c        ****     platform_init();
+  31              		.loc 1 23 5 view .LVU1
+  22:main.c        ****     platform_init();
+  32              		.loc 1 22 1 is_stmt 0 view .LVU2
+  33 0000 10B5     		push	{r4, lr}
+  34              	.LCFI0:
+  35              		.cfi_def_cfa_offset 8
+  36              		.cfi_offset 4, -8
+  37              		.cfi_offset 14, -4
+  38              		.loc 1 23 5 view .LVU3
+  39 0002 FFF7FEFF 		bl	platform_init
+  40              	.LVL0:
+  24:main.c        ****     init_uart();
+  41              		.loc 1 24 5 is_stmt 1 view .LVU4
+  25:main.c        ****     trigger_setup();
+  26:main.c        **** 
+  27:main.c        ****     simple_init();
+  28:main.c        **** 	simple_run();
+  29:main.c        ****     
+  30:main.c        ****     return 0;
+  31:main.c        **** }
+  42              		.loc 1 31 1 is_stmt 0 view .LVU5
+  43              		@ sp needed
+  24:main.c        ****     init_uart();
+  44              		.loc 1 24 5 view .LVU6
+  45 0006 FFF7FEFF 		bl	init_uart
+  46              	.LVL1:
+  25:main.c        ****     trigger_setup();
+  47              		.loc 1 25 5 is_stmt 1 view .LVU7
+  48 000a FFF7FEFF 		bl	trigger_setup
+  49              	.LVL2:
+  27:main.c        **** 	simple_run();
+  50              		.loc 1 27 5 view .LVU8
+  51 000e FFF7FEFF 		bl	simple_init
+  52              	.LVL3:
+  28:main.c        ****     
+  53              		.loc 1 28 2 view .LVU9
+  54 0012 FFF7FEFF 		bl	simple_run
+  55              	.LVL4:
+  30:main.c        **** }
+  56              		.loc 1 30 5 view .LVU10
+  57              		.loc 1 31 1 is_stmt 0 view .LVU11
+  58 0016 0020     		movs	r0, #0
+  59 0018 10BD     		pop	{r4, pc}
+  60              		.cfi_endproc
+  61              	.LFE0:
+  63              		.text
+  64              	.Letext0:
+  65              		.file 2 ".././hal/stm32f0/stm32f0_hal.h"
+  66              		.file 3 ".././hal/hal.h"
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 main.c
+     /tmp/cc7cIL1P.s:16     .text.startup.main:0000000000000000 $t
+     /tmp/cc7cIL1P.s:24     .text.startup.main:0000000000000000 main
+
+UNDEFINED SYMBOLS
+platform_init
+init_uart
+trigger_setup
+simple_init
+simple_run
